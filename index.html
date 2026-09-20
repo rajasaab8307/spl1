@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FrameSplit — Batch Collage Cutter</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #f5f2ee;
+  --ink: #1a1612;
+  --card: #ffffff;
+  --border: #e0dbd4;
+  --accent: #ff4500;
+  --muted: #9e9890;
+  --ok: #1e8e5a;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:'Outfit',sans-serif;min-height:100vh}
+
+header{
+  background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;height:60px;
+}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.06em}
+.logo span{color:var(--accent)}
+.header-tag{font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#888;border:1px solid #333;padding:4px 10px}
+
+.page{max-width:1140px;margin:0 auto;padding:40px 28px}
+
+.hero{margin-bottom:40px}
+.hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,7vw,5.5rem);line-height:0.95;letter-spacing:0.02em}
+.hero h1 .line2{color:var(--accent)}
+.hero p{margin-top:14px;color:var(--muted);font-size:0.88rem;line-height:1.8;max-width:520px;font-weight:300}
+
+.steps-wrap{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+
+.step-upload{flex:1 1 360px}
+.step-layouts{flex:1 1 360px}
+.step-label{font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.step-label::before{content:attr(data-n);width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:0.6rem;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+
+#drop-zone{border:2px dashed var(--border);border-radius:12px;padding:44px 28px;text-align:center;cursor:pointer;background:var(--card);transition:border-color .2s,background .2s,transform .15s;position:relative}
+#drop-zone:hover,#drop-zone.over{border-color:var(--accent);background:#fff8f6;transform:scale(1.01)}
+#drop-zone input{display:none}
+.dz-icon{width:52px;height:52px;margin:0 auto 16px;background:var(--bg);border-radius:10px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--border)}
+.dz-title{font-size:1rem;font-weight:600;margin-bottom:6px}
+.dz-sub{font-size:0.78rem;color:var(--muted)}
+
+/* Batch strip (thumbnails of all uploaded collages) */
+.batch-strip{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
+.batch-thumb{position:relative;width:76px;height:76px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);background:#f0ede8;cursor:default}
+.batch-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.batch-thumb .bt-remove{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(26,22,18,.75);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.batch-thumb .bt-remove:hover{background:var(--accent)}
+.batch-thumb .bt-name{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:0.5rem;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-add{width:76px;height:76px;border-radius:8px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:1.4rem;background:var(--card);transition:border-color .18s,color .18s}
+.batch-add:hover{border-color:var(--accent);color:var(--accent)}
+
+.layouts-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px}
+
+.layout-card{background:var(--card);border:2px solid var(--border);border-radius:10px;padding:10px 6px 8px;cursor:pointer;transition:border-color .18s,background .18s,transform .18s;text-align:center}
+.layout-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.layout-card.active{border-color:var(--accent);background:#fff8f6}
+.layout-card.active .lc-name{color:var(--accent)}
+
+.lc-diagram{width:100%;aspect-ratio:16/9;background:#f0ede8;border-radius:5px;display:grid;gap:2px;margin-bottom:6px;overflow:hidden;position:relative}
+.lc-diagram.portrait{aspect-ratio:9/16}
+.lc-diagram .cell{background:var(--muted);opacity:.35;border-radius:2px}
+.lc-diagram .cell.big{opacity:.55}
+.layout-card.active .lc-diagram .cell{background:var(--accent)}
+.lc-name{font-size:0.6rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)}
+.lc-ratio{font-size:0.58rem;color:var(--muted);margin-top:2px}
+
+.preview-section{margin-top:40px;display:none;animation:fadeIn .3s ease}
+.preview-section.visible{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.04em;margin-bottom:20px;display:flex;align-items:center;gap:14px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.preview-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.gap-row{display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--muted)}
+.gap-row input[type=range]{width:140px;accent-color:var(--accent)}
+.gap-val{min-width:32px;text-align:right;font-weight:600;color:var(--ink);font-size:0.8rem}
+
+.fmt-btns{display:flex;gap:8px}
+.fmt-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-family:'Outfit',sans-serif;font-size:0.75rem;font-weight:600;padding:8px 14px;cursor:pointer;transition:border-color .18s,background .18s,color .18s;text-align:center;color:var(--muted)}
+.fmt-btn.active{background:var(--ink);border-color:var(--ink);color:#fff}
+
+.quality-row{display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--muted)}
+.quality-row input[type=range]{width:120px;accent-color:var(--accent)}
+.quality-row.disabled{opacity:.4;pointer-events:none}
+.quality-hint{width:100%;font-size:0.72rem;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-top:10px;display:none}
+.quality-hint.visible{display:block}
+
+.privacy-note{width:100%;font-size:0.72rem;color:var(--ok);background:#eaf7f0;border:1px solid #cdeadc;border-radius:8px;padding:9px 12px;margin-top:12px}
+.skip-warning{font-size:0.78rem;color:#a15c00;background:#fff4e0;border:1px solid #f0d9a8;border-radius:8px;padding:10px 14px;margin-bottom:20px}
+
+.collage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
+.collage-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
+.cc-canvas-wrap{position:relative;background:#f0ede8}
+.cc-canvas-wrap canvas{display:block;width:100%}
+.cc-canvas-wrap .cc-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cc-footer{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cc-name{font-size:0.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-dims{font-size:0.62rem;color:var(--muted)}
+
+.action-row{display:flex;align-items:center;gap:14px;margin-top:28px;flex-wrap:wrap}
+#slice-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:0.08em;padding:16px 34px;cursor:pointer;transition:opacity .18s,transform .1s}
+#slice-btn:hover{opacity:.88}
+#slice-btn:active{transform:scale(.97)}
+#slice-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.reset-btn{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:8px;font-family:'Outfit',sans-serif;font-size:0.78rem;padding:14px 18px;cursor:pointer;transition:border-color .2s,color .2s}
+.reset-btn:hover{border-color:var(--ink);color:var(--ink)}
+
+.progress-wrap{flex:1 1 220px;display:none;align-items:center;gap:10px}
+.progress-wrap.visible{display:flex}
+.progress-bar{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);width:0%;transition:width .1s}
+.progress-label{font-size:0.7rem;color:var(--muted);white-space:nowrap}
+
+#results-section{margin-top:48px;display:none}
+#results-section.visible{display:block;animation:fadeIn .3s ease}
+.results-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.results-info{font-size:0.8rem;color:var(--muted)}
+.results-info strong{color:var(--ink)}
+.dl-all-btn{background:var(--ink);color:#fff;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:0.82rem;font-weight:600;padding:12px 24px;cursor:pointer;transition:opacity .2s;display:flex;align-items:center;gap:8px}
+.dl-all-btn:hover{opacity:.8}
+.dl-all-btn:disabled{opacity:.5;cursor:not-allowed}
+
+.group-block{margin-bottom:32px}
+.group-title{font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.group-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+
+.tiles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.tile-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s;animation:fadeIn .35s ease both}
+.tile-card:hover{border-color:var(--accent);box-shadow:0 6px 24px rgba(255,69,0,.1);transform:translateY(-4px)}
+.tile-img-wrap{background:#f0ede8;overflow:hidden}
+.tile-img-wrap img{display:block;width:100%}
+.tile-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+.tile-name{font-size:0.7rem;font-weight:600;color:var(--ink)}
+.tile-dims{font-size:0.62rem;color:var(--muted)}
+.tile-dl-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:0.68rem;font-weight:600;padding:5px 10px;cursor:pointer;transition:opacity .18s;font-family:'Outfit',sans-serif}
+.tile-dl-btn:hover{opacity:.8}
+
+.empty-hint{font-size:0.8rem;color:var(--muted);padding:20px 0}
+
+@media(max-width:640px){
+  header{padding:0 20px}
+  .page{padding:28px 16px}
+  .layouts-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Frame<span>Split</span></div>
+  <div class="header-tag">Batch Collage Cutter</div>
+</header>
+
+<div class="page">
+
+  <div class="hero">
+    <h1>SPLIT ALL YOUR<br><span class="line2">COLLAGE FRAMES</span></h1>
+    <p>Upload as many collages as you like, pick one layout, and extract every frame from every image — then grab the whole batch as a single zip.</p>
+  </div>
+
+  <div class="steps-wrap">
+    <div class="step-upload">
+      <div class="step-label" data-n="1">Upload Collages</div>
+      <div id="drop-zone">
+        <input type="file" id="file-input" accept="image/*" multiple>
+        <div class="dz-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <path d="M3 15l5-5 4 4 3-3 6 6"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+          </svg>
+        </div>
+        <div class="dz-title">Drop collage images here</div>
+        <div class="dz-sub">Multiple files welcome · PNG · JPG · WEBP</div>
+      </div>
+      <div class="batch-strip" id="batch-strip"></div>
+    </div>
+
+    <div class="step-layouts">
+      <div class="step-label" data-n="2">Choose One Layout For All</div>
+      <div class="layouts-grid" id="layouts-grid"></div>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-section" id="preview-section">
+    <div class="section-title">PREVIEW &amp; CUT</div>
+
+    <div class="preview-toolbar">
+      <div class="gap-row">
+        <span>Border gap</span>
+        <input type="range" id="gap-slider" min="0" max="60" value="12">
+        <span class="gap-val" id="gap-val">12px</span>
+      </div>
+      <div class="fmt-btns">
+        <div class="fmt-btn active" data-fmt="png">PNG</div>
+        <div class="fmt-btn" data-fmt="jpeg">JPG</div>
+        <div class="fmt-btn" data-fmt="webp">WEBP</div>
+      </div>
+      <div class="quality-row" id="quality-row">
+        <span>Compression</span>
+        <input type="range" id="quality-slider" min="40" max="100" value="80">
+        <span class="gap-val" id="quality-val">80%</span>
+      </div>
+    </div>
+    <div class="quality-hint" id="quality-hint">PNG is lossless — it always saves at full size. Switch to <strong>WEBP</strong> to cut file size roughly in half with no visible quality loss.</div>
+    <div class="privacy-note" id="privacy-note">🔒 Exported frames carry no EXIF, GPS, or capture date/time — each is re-encoded from scratch and saved under a random filename, not the original one.</div>
+
+    <div class="collage-grid" id="collage-grid"></div>
+
+    <div class="action-row">
+      <button id="slice-btn">✂ EXTRACT ALL FRAMES</button>
+      <div class="progress-wrap" id="prog-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+        <div class="progress-label" id="prog-label">0 / 0</div>
+      </div>
+      <button class="reset-btn" id="reset-btn">← Clear all &amp; start over</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section">
+    <div class="section-title">EXTRACTED FRAMES</div>
+    <div class="results-bar">
+      <div class="results-info"><strong id="frame-count">0</strong> frames from <strong id="collage-count">0</strong> collages</div>
+      <button class="dl-all-btn" id="dl-all-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download All as ZIP
+      </button>
+    </div>
+    <div id="groups-wrap"></div>
+  </div>
+
+</div>
+
+<script>
+// ─── LAYOUT DEFINITIONS ───────────────────────────────────────────
+const LAYOUTS = [
+  {
+    id:'ls-3eq', name:'3 Equal', ratio:'16:9', orient:'Landscape', frames:3,
+    diag:{type:'cols3', portrait:false},
+    getFrames(W,H,g){
+      const w=Math.floor((W-2*g)/3);
+      return [
+        {x:0,        y:0,w:w,            h:H},
+        {x:w+g,      y:0,w:w,            h:H},
+        {x:2*w+2*g,  y:0,w:W-(2*w+2*g), h:H},
+      ];
+    }
+  },
+  {
+    id:'ls-3big', name:'1 Big+2', ratio:'16:9', orient:'Landscape', frames:3,
+    diag:{type:'ls-3big', portrait:false},
+    getFrames(W,H,g){
+      const bigW=Math.floor(W*0.55);
+      const smW=W-bigW-g;
+      const smH=Math.floor((H-g)/2);
+      return [
+        {x:0,       y:0,      w:bigW, h:H},
+        {x:bigW+g,  y:0,      w:smW,  h:smH},
+        {x:bigW+g,  y:smH+g,  w:smW,  h:H-smH-g},
+      ];
+    }
+  },
+  {
+    id:'ls-4eq', name:'4 Grid', ratio:'16:9', orient:'Landscape', frames:4,
+    diag:{type:'grid2x2', portrait:false},
+    getFrames(W,H,g){
+      const hw=Math.floor((W-g)/2), hh=Math.floor((H-g)/2);
+      return [
+        {x:0,    y:0,    w:hw,       h:hh},
+        {x:hw+g, y:0,    w:W-hw-g,   h:hh},
+        {x:0,    y:hh+g, w:hw,       h:H-hh-g},
+        {x:hw+g, y:hh+g, w:W-hw-g,   h:H-hh-g},
+      ];
+    }
+  },
+  {
+    id:'ls-4cols', name:'4 Strips', ratio:'16:9', orient:'Landscape', frames:4,
+    diag:{type:'cols4', portrait:false},
+    getFrames(W,H,g){
+      const w=Math.floor((W-3*g)/4);
+      return [
+        {x:0,           y:0,w:w,             h:H},
+        {x:w+g,         y:0,w:w,             h:H},
+        {x:2*(w+g),     y:0,w:w,             h:H},
+        {x:3*(w+g),     y:0,w:W-3*(w+g),     h:H},
+      ];
+    }
+  },
+  {
+    id:'pt-3eq', name:'3 Equal', ratio:'9:16', orient:'Portrait', frames:3,
+    diag:{type:'rows3', portrait:true},
+    getFrames(W,H,g){
+      const h=Math.floor((H-2*g)/3);
+      return [
+        {x:0,y:0,           w:W,h:h},
+        {x:0,y:h+g,         w:W,h:h},
+        {x:0,y:2*h+2*g,     w:W,h:H-(2*h+2*g)},
+      ];
+    }
+  },
+  {
+    id:'pt-3big', name:'1 Big+2', ratio:'9:16', orient:'Portrait', frames:3,
+    diag:{type:'pt-3big', portrait:true},
+    getFrames(W,H,g){
+      const bigH=Math.floor(H*0.55);
+      const smH=H-bigH-g;
+      const smW=Math.floor((W-g)/2);
+      return [
+        {x:0,     y:0,       w:W,         h:bigH},
+        {x:0,     y:bigH+g,  w:smW,       h:smH},
+        {x:smW+g, y:bigH+g,  w:W-smW-g,   h:smH},
+      ];
+    }
+  },
+  {
+    id:'pt-4eq', name:'4 Grid', ratio:'9:16', orient:'Portrait', frames:4,
+    diag:{type:'grid2x2', portrait:true},
+    getFrames(W,H,g){
+      const hw=Math.floor((W-g)/2), hh=Math.floor((H-g)/2);
+      return [
+        {x:0,    y:0,    w:hw,      h:hh},
+        {x:hw+g, y:0,    w:W-hw-g,  h:hh},
+        {x:0,    y:hh+g, w:hw,      h:H-hh-g},
+        {x:hw+g, y:hh+g, w:W-hw-g,  h:H-hh-g},
+      ];
+    }
+  },
+  {
+    id:'pt-4rows', name:'4 Strips', ratio:'9:16', orient:'Portrait', frames:4,
+    diag:{type:'rows4', portrait:true},
+    getFrames(W,H,g){
+      const h=Math.floor((H-3*g)/4);
+      return [
+        {x:0,y:0,          w:W,h:h},
+        {x:0,y:h+g,        w:W,h:h},
+        {x:0,y:2*(h+g),    w:W,h:h},
+        {x:0,y:3*(h+g),    w:W,h:H-3*(h+g)},
+      ];
+    }
+  },
+];
+
+// ─── STATE ────────────────────────────────────────────────────────
+let collages = [];      // { id, name, alias, img, W, H }
+let selectedLayout = LAYOUTS[0];
+let outputFmt = 'png';
+let outputQuality = 0.8;
+let gapPx = 12;
+let resultGroups = [];  // { alias, tiles:[{dataUrl,name,w,h}] }
+let idCounter = 0;
+const usedNames = new Set();
+
+// Random lowercase filename generator — output files carry no trace of the
+// original filename, capture date/time, or any other embedded metadata.
+// Re-drawing onto <canvas> and re-encoding via toDataURL already discards
+// all EXIF (camera model, GPS, timestamp, etc.) — only raw pixels remain.
+function randStr(len = 11) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz';
+  let s = '';
+  do {
+    s = '';
+    for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  } while (usedNames.has(s));
+  usedNames.add(s);
+  return s;
+}
+
+// ─── DIAGRAM BUILDER ──────────────────────────────────────────────
+function buildDiagram(layout) {
+  const d = layout.diag;
+  const el = document.createElement('div');
+  el.className = 'lc-diagram' + (d.portrait ? ' portrait' : '');
+  const t = d.type;
+  const configs = {
+    'cols3':   {cols:'1fr 1fr 1fr', rows:'1fr',           cells:[{},{},{}]},
+    'cols4':   {cols:'1fr 1fr 1fr 1fr', rows:'1fr',        cells:[{},{},{},{}]},
+    'rows3':   {cols:'1fr', rows:'1fr 1fr 1fr',            cells:[{},{},{}]},
+    'rows4':   {cols:'1fr', rows:'1fr 1fr 1fr 1fr',        cells:[{},{},{},{}]},
+    'grid2x2': {cols:'1fr 1fr', rows:'1fr 1fr',            cells:[{},{},{},{}]},
+    'ls-3big': {cols:'55fr 44fr', rows:'1fr 1fr',          cells:[{big:true,rowSpan:'1/3'},{},{}]},
+    'pt-3big': {cols:'1fr 1fr', rows:'55fr 44fr',          cells:[{big:true,colSpan:'1/3'},{},{}]},
+  };
+  const cfg = configs[t];
+  if(!cfg) return el;
+  el.style.gridTemplateColumns = cfg.cols;
+  el.style.gridTemplateRows    = cfg.rows;
+  cfg.cells.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'cell' + (c.big ? ' big' : '');
+    if(c.rowSpan) div.style.gridRow = c.rowSpan;
+    if(c.colSpan) div.style.gridColumn = c.colSpan;
+    el.appendChild(div);
+  });
+  return el;
+}
+
+function buildLayoutCards() {
+  const grid = document.getElementById('layouts-grid');
+  grid.innerHTML = '';
+  LAYOUTS.forEach(layout => {
+    const card = document.createElement('div');
+    card.className = 'layout-card' + (layout === selectedLayout ? ' active' : '');
+    card.dataset.id = layout.id;
+    card.appendChild(buildDiagram(layout));
+    const name  = document.createElement('div'); name.className = 'lc-name';  name.textContent = layout.name;
+    const ratio = document.createElement('div'); ratio.className = 'lc-ratio'; ratio.textContent = layout.ratio + ' · ' + layout.frames;
+    card.appendChild(name); card.appendChild(ratio);
+    card.addEventListener('click', () => selectLayout(layout));
+    grid.appendChild(card);
+  });
+}
+
+function selectLayout(layout) {
+  selectedLayout = layout;
+  document.querySelectorAll('.layout-card').forEach(c => c.classList.toggle('active', c.dataset.id === layout.id));
+  renderCollageGrid();
+}
+
+// ─── UPLOAD (multi) ───────────────────────────────────────────────
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  files.forEach(loadImg);
+});
+fileInput.addEventListener('change', () => {
+  [...fileInput.files].forEach(loadImg);
+  fileInput.value = '';
+});
+
+function loadImg(file) {
+  const r = new FileReader();
+  r.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      collages.push({
+        id: 'c' + (idCounter++),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        alias: randStr(9),
+        img,
+        W: img.naturalWidth,
+        H: img.naturalHeight
+      });
+      renderBatchStrip();
+      renderCollageGrid();
+      document.getElementById('preview-section').classList.add('visible');
+    };
+    img.src = ev.target.result;
+  };
+  r.readAsDataURL(file);
+}
+
+function removeCollage(id) {
+  collages = collages.filter(c => c.id !== id);
+  renderBatchStrip();
+  renderCollageGrid();
+  if(collages.length === 0){
+    document.getElementById('preview-section').classList.remove('visible');
+    document.getElementById('results-section').classList.remove('visible');
+  }
+}
+
+function renderBatchStrip() {
+  const strip = document.getElementById('batch-strip');
+  strip.innerHTML = '';
+  collages.forEach(c => {
+    const thumb = document.createElement('div');
+    thumb.className = 'batch-thumb';
+    const im = document.createElement('img'); im.src = c.img.src;
+    const rm = document.createElement('button'); rm.className='bt-remove'; rm.textContent='✕';
+    rm.addEventListener('click', () => removeCollage(c.id));
+    const nm = document.createElement('div'); nm.className='bt-name'; nm.textContent = c.name;
+    thumb.appendChild(im); thumb.appendChild(rm); thumb.appendChild(nm);
+    strip.appendChild(thumb);
+  });
+  if(collages.length){
+    const add = document.createElement('div');
+    add.className = 'batch-add';
+    add.textContent = '+';
+    add.addEventListener('click', () => fileInput.click());
+    strip.appendChild(add);
+  }
+}
+
+// ─── PER-COLLAGE PREVIEW GRID (with overlay) ──────────────────────
+function renderCollageGrid() {
+  const grid = document.getElementById('collage-grid');
+  grid.innerHTML = '';
+  if(collages.length === 0){
+    grid.innerHTML = '<div class="empty-hint">No collages yet — upload one or more above.</div>';
+    return;
+  }
+  collages.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'collage-card';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cc-canvas-wrap';
+    const canvas = document.createElement('canvas');
+    const overlay = document.createElement('canvas');
+    overlay.className = 'cc-overlay';
+    wrap.appendChild(canvas);
+    wrap.appendChild(overlay);
+    card.appendChild(wrap);
+
+    const footer = document.createElement('div');
+    footer.className = 'cc-footer';
+    footer.innerHTML = `<span class="cc-name">${c.name}</span><span class="cc-dims">${c.W}×${c.H}</span>`;
+    card.appendChild(footer);
+
+    grid.appendChild(card);
+    drawCollagePreview(c, canvas, overlay);
+  });
+}
+
+function drawCollagePreview(c, canvas, overlay) {
+  const maxW = 460;
+  const scale = Math.min(1, maxW / c.W);
+  canvas.width  = c.W * scale;
+  canvas.height = c.H * scale;
+  overlay.width  = canvas.width;
+  overlay.height = canvas.height;
+  canvas.getContext('2d').drawImage(c.img, 0, 0, canvas.width, canvas.height);
+
+  const pW = canvas.width, pH = canvas.height;
+  const sx = pW / c.W, sy = pH / c.H;
+  const frames = selectedLayout.getFrames(c.W, c.H, gapPx);
+  const oc = overlay.getContext('2d');
+  oc.clearRect(0, 0, pW, pH);
+  oc.fillStyle = 'rgba(0,0,0,0.25)';
+  oc.fillRect(0, 0, pW, pH);
+
+  frames.forEach((f, i) => {
+    const px=f.x*sx, py=f.y*sy, pw=f.w*sx, ph=f.h*sy;
+    oc.clearRect(px, py, pw, ph);
+    oc.fillStyle = 'rgba(255,69,0,0.06)';
+    oc.fillRect(px, py, pw, ph);
+    oc.strokeStyle = 'rgba(255,69,0,1)';
+    oc.lineWidth = 2;
+    oc.strokeRect(px+1, py+1, pw-2, ph-2);
+    const bx=px+9, by=py+9, br=11;
+    oc.beginPath(); oc.arc(bx+br, by+br, br, 0, Math.PI*2); oc.fillStyle='rgba(255,69,0,0.95)'; oc.fill();
+    oc.fillStyle='#fff';
+    oc.font = 'bold 11px Outfit,sans-serif';
+    oc.textAlign='center'; oc.textBaseline='middle';
+    oc.fillText(i+1, bx+br, by+br);
+  });
+}
+
+// ─── GAP / FORMAT CONTROLS ────────────────────────────────────────
+document.getElementById('gap-slider').addEventListener('input', function(){
+  gapPx = parseInt(this.value);
+  document.getElementById('gap-val').textContent = gapPx+'px';
+  renderCollageGrid();
+});
+document.querySelectorAll('.fmt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    outputFmt = btn.dataset.fmt;
+    updateQualityControls();
+  });
+});
+document.getElementById('quality-slider').addEventListener('input', function(){
+  outputQuality = parseInt(this.value) / 100;
+  document.getElementById('quality-val').textContent = this.value + '%';
+});
+function updateQualityControls() {
+  const isPng = outputFmt === 'png';
+  document.getElementById('quality-row').classList.toggle('disabled', isPng);
+  document.getElementById('quality-hint').classList.toggle('visible', isPng);
+}
+updateQualityControls();
+
+// ─── SLICE ALL ────────────────────────────────────────────────────
+document.getElementById('slice-btn').addEventListener('click', () => { if(collages.length) doSliceAll(); });
+
+function doSliceAll() {
+  const sliceBtn = document.getElementById('slice-btn');
+  sliceBtn.disabled = true;
+  const progWrap  = document.getElementById('prog-wrap');
+  const progFill  = document.getElementById('prog-fill');
+  const progLabel = document.getElementById('prog-label');
+  progWrap.classList.add('visible');
+
+  const mime = {png:'image/png', jpeg:'image/jpeg', webp:'image/webp'}[outputFmt];
+  resultGroups = [];
+  usedNames.clear();
+  let skippedFrames = 0;
+
+  let totalFrames = 0;
+  const plan = collages.map(c => {
+    const frames = selectedLayout.getFrames(c.W, c.H, gapPx);
+    totalFrames += frames.length;
+    return { c, frames };
+  });
+
+  let done = 0;
+  let seq = 0;
+  const pad = String(totalFrames).length;
+  let ci = 0;
+  function nextCollage() {
+    if(ci >= plan.length) { finish(); return; }
+    const { c, frames } = plan[ci];
+    const group = { displayName: c.name, alias: c.alias, tiles: [] };
+    let fi = 0;
+    function nextFrame() {
+      if(fi >= frames.length) {
+        resultGroups.push(group);
+        ci++;
+        requestAnimationFrame(nextCollage);
+        return;
+      }
+      const f = frames[fi];
+      const x = Math.max(0, f.x), y = Math.max(0, f.y);
+      const w = Math.min(f.w, c.W-x), h = Math.min(f.h, c.H-y);
+      if (w <= 0 || h <= 0) {
+        // Degenerate slice (gap too large for this image at this layout) —
+        // skip it instead of producing a broken/empty image.
+        skippedFrames++;
+        fi++;
+        requestAnimationFrame(nextFrame);
+        return;
+      }
+      const tc = document.createElement('canvas');
+      tc.width = w; tc.height = h;
+      tc.getContext('2d').drawImage(c.img, x, y, w, h, 0, 0, w, h);
+      let dataUrl;
+      try {
+        dataUrl = tc.toDataURL(mime, outputQuality);
+      } catch (err) {
+        // Canvas failed to encode (e.g. tainted canvas) — skip rather than
+        // pushing a broken tile that would fail to download correctly.
+        skippedFrames++;
+        fi++;
+        requestAnimationFrame(nextFrame);
+        return;
+      }
+      group.tiles.push({
+        dataUrl,
+        name: `${String(++seq).padStart(pad, '0')}_${randStr(8)}.${outputFmt}`,
+        w, h
+      });
+      done++; fi++;
+      progFill.style.width = Math.round((done/totalFrames)*100)+'%';
+      progLabel.textContent = `${done} / ${totalFrames}`;
+      requestAnimationFrame(nextFrame);
+    }
+    nextFrame();
+  }
+  nextCollage();
+
+  function finish() {
+    sliceBtn.disabled = false;
+    progWrap.classList.remove('visible');
+    progFill.style.width = '0%';
+    renderResults(skippedFrames);
+  }
+}
+
+// ─── RESULTS ──────────────────────────────────────────────────────
+function renderResults(skippedFrames = 0) {
+  const wrap = document.getElementById('groups-wrap');
+  wrap.innerHTML = '';
+  let totalFrames = 0;
+
+  if (skippedFrames > 0) {
+    const warn = document.createElement('div');
+    warn.className = 'skip-warning';
+    warn.textContent = `⚠ ${skippedFrames} frame${skippedFrames>1?'s':''} skipped — the border gap was too large for that image at this layout, so no broken files were included.`;
+    wrap.appendChild(warn);
+  }
+
+  resultGroups.forEach(group => {
+    if (group.tiles.length === 0) return;
+    totalFrames += group.tiles.length;
+    const block = document.createElement('div');
+    block.className = 'group-block';
+    const title = document.createElement('div');
+    title.className = 'group-title';
+    title.textContent = `${group.displayName} — ${group.tiles.length} frames`;
+    block.appendChild(title);
+
+    const tilesGrid = document.createElement('div');
+    tilesGrid.className = 'tiles-grid';
+    group.tiles.forEach((tile, idx) => {
+      const card = document.createElement('div');
+      card.className = 'tile-card';
+      card.style.animationDelay = (idx*0.05)+'s';
+      const iw = document.createElement('div'); iw.className='tile-img-wrap';
+      const im = document.createElement('img'); im.src=tile.dataUrl; im.alt=tile.name;
+      iw.appendChild(im);
+      const ft = document.createElement('div'); ft.className='tile-footer';
+      const approxBytes = Math.round((tile.dataUrl.length - tile.dataUrl.indexOf(',') - 1) * 0.75);
+      const sizeLabel = approxBytes > 1024*1024
+        ? (approxBytes/1024/1024).toFixed(1)+' MB'
+        : Math.round(approxBytes/1024)+' KB';
+      ft.innerHTML = `<div><div class="tile-name">Frame ${idx+1}</div><div class="tile-dims">${tile.w}×${tile.h}px · ${sizeLabel}</div></div><button class="tile-dl-btn">↓ Save</button>`;
+      ft.querySelector('.tile-dl-btn').addEventListener('click', () => {
+        if (!tile.dataUrl || tile.dataUrl === 'data:,') return;
+        const a = document.createElement('a');
+        a.href = tile.dataUrl; a.download = tile.name; a.click();
+      });
+      card.appendChild(iw); card.appendChild(ft);
+      tilesGrid.appendChild(card);
+    });
+    block.appendChild(tilesGrid);
+    wrap.appendChild(block);
+  });
+
+  document.getElementById('frame-count').textContent = totalFrames;
+  document.getElementById('collage-count').textContent = resultGroups.length;
+  document.getElementById('results-section').classList.add('visible');
+  document.getElementById('results-section').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ─── ONE-CLICK ZIP DOWNLOAD ───────────────────────────────────────
+document.getElementById('dl-all-btn').addEventListener('click', async () => {
+  if(resultGroups.length === 0) return;
+  const btn = document.getElementById('dl-all-btn');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Zipping…';
+
+  const zip = new JSZip();
+  resultGroups.forEach(group => {
+    group.tiles.forEach(tile => {
+      const base64 = tile.dataUrl.split(',')[1];
+      zip.file(tile.name, base64, { base64: true });
+    });
+  });
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${randStr(11)}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  btn.disabled = false;
+  btn.innerHTML = originalHTML;
+});
+
+// ─── RESET ────────────────────────────────────────────────────────
+document.getElementById('reset-btn').addEventListener('click', () => {
+  collages = [];
+  resultGroups = [];
+  renderBatchStrip();
+  renderCollageGrid();
+  document.getElementById('preview-section').classList.remove('visible');
+  document.getElementById('results-section').classList.remove('visible');
+  fileInput.value = '';
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────
+buildLayoutCards();
+renderCollageGrid();
+</script>
+</body>
+</html>
