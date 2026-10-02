@@ -1,780 +1,351 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FrameSplit — Batch Collage Cutter</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
-:root {
-  --bg: #f5f2ee;
-  --ink: #1a1612;
-  --card: #ffffff;
-  --border: #e0dbd4;
-  --accent: #ff4500;
-  --muted: #9e9890;
-  --ok: #1e8e5a;
-}
+:root{--bg:#f5f2ee;--ink:#1a1612;--card:#fff;--border:#e0dbd4;--accent:#ff4500;--muted:#9e9890;--ok:#1e8e5a}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:'Outfit',sans-serif;min-height:100vh}
-
-header{
-  background:var(--ink);color:#fff;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 40px;height:60px;
-}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.06em}
-.logo span{color:var(--accent)}
-.header-tag{font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#888;border:1px solid #333;padding:4px 10px}
-
+button{font-family:inherit;color:inherit}
+header{background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 40px;height:60px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:.06em}.logo span{color:var(--accent)}
 .page{max-width:1140px;margin:0 auto;padding:40px 28px}
-
-.hero{margin-bottom:40px}
-.hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,7vw,5.5rem);line-height:0.95;letter-spacing:0.02em}
-.hero h1 .line2{color:var(--accent)}
-.hero p{margin-top:14px;color:var(--muted);font-size:0.88rem;line-height:1.8;max-width:520px;font-weight:300}
-
-.steps-wrap{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
-
-.step-upload{flex:1 1 360px}
-.step-layouts{flex:1 1 360px}
-.step-label{font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.step-label::before{content:attr(data-n);width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:0.6rem;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
-
-#drop-zone{border:2px dashed var(--border);border-radius:12px;padding:44px 28px;text-align:center;cursor:pointer;background:var(--card);transition:border-color .2s,background .2s,transform .15s;position:relative}
-#drop-zone:hover,#drop-zone.over{border-color:var(--accent);background:#fff8f6;transform:scale(1.01)}
-#drop-zone input{display:none}
-.dz-icon{width:52px;height:52px;margin:0 auto 16px;background:var(--bg);border-radius:10px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--border)}
-.dz-title{font-size:1rem;font-weight:600;margin-bottom:6px}
-.dz-sub{font-size:0.78rem;color:var(--muted)}
-
-/* Batch strip (thumbnails of all uploaded collages) */
-.batch-strip{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
-.batch-thumb{position:relative;width:76px;height:76px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border);background:#f0ede8;cursor:default}
-.batch-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.batch-thumb .bt-remove{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(26,22,18,.75);color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.batch-thumb .bt-remove:hover{background:var(--accent)}
-.batch-thumb .bt-name{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:0.5rem;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.batch-add{width:76px;height:76px;border-radius:8px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:1.4rem;background:var(--card);transition:border-color .18s,color .18s}
-.batch-add:hover{border-color:var(--accent);color:var(--accent)}
-
-.layouts-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px}
-
-.layout-card{background:var(--card);border:2px solid var(--border);border-radius:10px;padding:10px 6px 8px;cursor:pointer;transition:border-color .18s,background .18s,transform .18s;text-align:center}
-.layout-card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.layout-card.active{border-color:var(--accent);background:#fff8f6}
-.layout-card.active .lc-name{color:var(--accent)}
-
-.lc-diagram{width:100%;aspect-ratio:16/9;background:#f0ede8;border-radius:5px;display:grid;gap:2px;margin-bottom:6px;overflow:hidden;position:relative}
-.lc-diagram.portrait{aspect-ratio:9/16}
-.lc-diagram .cell{background:var(--muted);opacity:.35;border-radius:2px}
-.lc-diagram .cell.big{opacity:.55}
-.layout-card.active .lc-diagram .cell{background:var(--accent)}
-.lc-name{font-size:0.6rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted)}
-.lc-ratio{font-size:0.58rem;color:var(--muted);margin-top:2px}
-
-.preview-section{margin-top:40px;display:none;animation:fadeIn .3s ease}
-.preview-section.visible{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-
-.section-title{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.04em;margin-bottom:20px;display:flex;align-items:center;gap:14px}
-.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
-
-.preview-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
-.gap-row{display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--muted)}
-.gap-row input[type=range]{width:140px;accent-color:var(--accent)}
-.gap-val{min-width:32px;text-align:right;font-weight:600;color:var(--ink);font-size:0.8rem}
-
-.fmt-btns{display:flex;gap:8px}
-.fmt-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-family:'Outfit',sans-serif;font-size:0.75rem;font-weight:600;padding:8px 14px;cursor:pointer;transition:border-color .18s,background .18s,color .18s;text-align:center;color:var(--muted)}
-.fmt-btn.active{background:var(--ink);border-color:var(--ink);color:#fff}
-
-.quality-row{display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--muted)}
-.quality-row input[type=range]{width:120px;accent-color:var(--accent)}
-.quality-row.disabled{opacity:.4;pointer-events:none}
-.quality-hint{width:100%;font-size:0.72rem;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-top:10px;display:none}
-.quality-hint.visible{display:block}
-
-.privacy-note{width:100%;font-size:0.72rem;color:var(--ok);background:#eaf7f0;border:1px solid #cdeadc;border-radius:8px;padding:9px 12px;margin-top:12px}
-.skip-warning{font-size:0.78rem;color:#a15c00;background:#fff4e0;border:1px solid #f0d9a8;border-radius:8px;padding:10px 14px;margin-bottom:20px}
-
-.collage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
-.collage-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
-.cc-canvas-wrap{position:relative;background:#f0ede8}
-.cc-canvas-wrap canvas{display:block;width:100%}
-.cc-canvas-wrap .cc-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.cc-footer{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.cc-name{font-size:0.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cc-dims{font-size:0.62rem;color:var(--muted)}
-
-.action-row{display:flex;align-items:center;gap:14px;margin-top:28px;flex-wrap:wrap}
-#slice-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:0.08em;padding:16px 34px;cursor:pointer;transition:opacity .18s,transform .1s}
-#slice-btn:hover{opacity:.88}
-#slice-btn:active{transform:scale(.97)}
-#slice-btn:disabled{opacity:.4;cursor:not-allowed}
-
-.reset-btn{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:8px;font-family:'Outfit',sans-serif;font-size:0.78rem;padding:14px 18px;cursor:pointer;transition:border-color .2s,color .2s}
-.reset-btn:hover{border-color:var(--ink);color:var(--ink)}
-
-.progress-wrap{flex:1 1 220px;display:none;align-items:center;gap:10px}
-.progress-wrap.visible{display:flex}
-.progress-bar{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
-.progress-fill{height:100%;background:var(--accent);width:0%;transition:width .1s}
-.progress-label{font-size:0.7rem;color:var(--muted);white-space:nowrap}
-
-#results-section{margin-top:48px;display:none}
-#results-section.visible{display:block;animation:fadeIn .3s ease}
-.results-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-.results-info{font-size:0.8rem;color:var(--muted)}
-.results-info strong{color:var(--ink)}
-.dl-all-btn{background:var(--ink);color:#fff;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:0.82rem;font-weight:600;padding:12px 24px;cursor:pointer;transition:opacity .2s;display:flex;align-items:center;gap:8px}
-.dl-all-btn:hover{opacity:.8}
-.dl-all-btn:disabled{opacity:.5;cursor:not-allowed}
-
-.group-block{margin-bottom:32px}
-.group-title{font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.group-title::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
-
-.tiles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
-.tile-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s,transform .2s;animation:fadeIn .35s ease both}
-.tile-card:hover{border-color:var(--accent);box-shadow:0 6px 24px rgba(255,69,0,.1);transform:translateY(-4px)}
-.tile-img-wrap{background:#f0ede8;overflow:hidden}
-.tile-img-wrap img{display:block;width:100%}
-.tile-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
-.tile-name{font-size:0.7rem;font-weight:600;color:var(--ink)}
-.tile-dims{font-size:0.62rem;color:var(--muted)}
-.tile-dl-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:0.68rem;font-weight:600;padding:5px 10px;cursor:pointer;transition:opacity .18s;font-family:'Outfit',sans-serif}
-.tile-dl-btn:hover{opacity:.8}
-
-.empty-hint{font-size:0.8rem;color:var(--muted);padding:20px 0}
-
-@media(max-width:640px){
-  header{padding:0 20px}
-  .page{padding:28px 16px}
-  .layouts-grid{grid-template-columns:repeat(2,1fr)}
-}
-</style>
-</head>
-<body>
-
-<header>
-  <div class="logo">Frame<span>Split</span></div>
-  <div class="header-tag">Batch Collage Cutter</div>
-</header>
-
+h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,7vw,5rem);line-height:.95}h1 span{color:var(--accent)}
+.hero p{margin:14px 0 36px;color:var(--muted);font-size:.88rem;line-height:1.8;max-width:520px}
+.steps{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}.steps>div{flex:1 1 360px}
+.lbl{font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px}
+#drop{border:2px dashed var(--border);border-radius:12px;padding:40px 24px;text-align:center;cursor:pointer;background:var(--card);transition:.2s}
+#drop:hover,#drop.over,#drop:focus-visible{border-color:var(--accent);background:#fff8f6;outline:none}
+#drop b{display:block;margin-bottom:6px}#drop small{color:var(--muted);font-size:.78rem}
+.strip{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
+.thumb{position:relative;width:76px;height:76px;border-radius:8px;overflow:hidden;border:1.5px solid var(--border)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb button{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(26,22,18,.75);color:#fff;border:none;font-size:11px;cursor:pointer}
+.err{font-size:.75rem;color:#b3261e;background:#fdecea;border-radius:8px;padding:8px 12px;margin-top:10px}
+.lgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.lc{background:var(--card);border:2px solid var(--border);border-radius:10px;padding:10px 6px 8px;cursor:pointer;text-align:center;transition:.18s}
+.lc:hover{border-color:var(--accent)}.lc.active{border-color:var(--accent);background:#fff8f6}
+.lc.auto{grid-column:1/-1;padding:12px}
+.dg{aspect-ratio:16/9;background:#f0ede8;border-radius:5px;display:grid;gap:2px;margin-bottom:6px}.dg.p{aspect-ratio:9/16}
+.dg i{background:var(--muted);opacity:.4;border-radius:2px}.lc.active .dg i{background:var(--accent)}
+.ln{font-size:.6rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}.lc.active .ln{color:var(--accent)}
+.sec{display:none;margin-top:40px}.sec.on{display:block}
+.st{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;margin-bottom:18px}
+.bar{display:flex;align-items:center;gap:18px 24px;flex-wrap:wrap;margin-bottom:14px;font-size:.78rem;color:var(--muted)}
+.bar label{display:flex;align-items:center;gap:8px}.bar input[type=range]{width:110px;accent-color:var(--accent)}.bar b{color:var(--ink);min-width:34px}
+.fmt{display:flex;gap:6px}.fmt button{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;font-size:.75rem;font-weight:600;padding:7px 13px;cursor:pointer;color:var(--muted)}
+.fmt button.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.note{font-size:.72rem;color:var(--ok);background:#eaf7f0;border:1px solid #cdeadc;border-radius:8px;padding:9px 12px;margin-bottom:16px}
+.warn{font-size:.78rem;color:#a15c00;background:#fff4e0;border:1px solid #f0d9a8;border-radius:8px;padding:10px 14px;margin-bottom:16px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
+.cc{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
+.cw{position:relative;background:#f0ede8}.cw canvas{display:block;width:100%}.cw canvas+canvas{position:absolute;inset:0;height:100%}
+.cf{padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:.7rem}
+.cf .r{display:flex;justify-content:space-between;gap:8px}.cf .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cf .d{color:var(--muted)}
+.cf select{font:inherit;padding:4px;border:1px solid var(--border);border-radius:6px;background:#fff;width:100%}.cf .w{color:#a15c00;font-size:.65rem}
+.acts{display:flex;align-items:center;gap:14px;margin-top:26px;flex-wrap:wrap}
+#go{background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:.08em;padding:15px 32px;cursor:pointer}
+#go:disabled{opacity:.4;cursor:wait}
+.ghost{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:8px;font-size:.78rem;padding:12px 16px;cursor:pointer}.ghost:hover{border-color:var(--ink);color:var(--ink)}
+.pw{flex:1 1 200px;display:none;align-items:center;gap:10px;font-size:.7rem;color:var(--muted)}.pw.on{display:flex}
+.pb{flex:1;height:3px;background:var(--border)}.pb div{height:100%;background:var(--accent);width:0}
+#res{margin-top:48px;display:none}#res.on{display:block}
+#stale{display:none}#res.stale #stale{display:block}
+.rb{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;font-size:.8rem;color:var(--muted)}
+.dl{background:var(--ink);color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:600;padding:11px 22px;cursor:pointer}.dl:disabled{opacity:.5;cursor:not-allowed}
+.gt{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.gt .ga{display:flex;gap:6px}
+.gt button{font-size:.65rem;border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 9px;cursor:pointer}.gt button:disabled{opacity:.5;cursor:not-allowed}
+.gb{margin-bottom:30px}.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.tc{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;transition:opacity .15s}.tc img{display:block;width:100%;background:#f0ede8;cursor:zoom-in}
+.tc.off{opacity:.45}.tc.off img{filter:grayscale(1)}
+.tf{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;font-size:.7rem}.tf small{display:block;color:var(--muted);font-size:.62rem}
+.tf button{background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:.68rem;font-weight:600;padding:5px 10px;cursor:pointer}
+.ck{display:flex;align-items:center;gap:5px;font-size:.68rem;cursor:pointer;user-select:none}.ck input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+/* lightbox */
+#lb{position:fixed;inset:0;z-index:50;background:rgba(15,12,9,.93);display:flex;align-items:center;justify-content:center;padding:16px}
+.lbbox{width:min(1100px,100%);max-height:100%;display:flex;flex-direction:column;gap:12px;color:#fff}
+.lbtop{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem}
+.lbr{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lbb{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;font-size:.78rem;font-weight:600;padding:8px 13px;cursor:pointer}
+.lbbox:focus,.lbc canvas:focus{outline:none}
+.lbb:hover{background:rgba(255,255,255,.22)}.lbb.pri{background:var(--accent);border-color:var(--accent)}
+.lbstage{display:flex;align-items:center;gap:10px;min-height:0}
+.lbc{flex:1;display:flex;align-items:center;justify-content:center;min-width:0}
+.lbc img{max-width:100%;max-height:calc(100vh - 170px);object-fit:contain;border-radius:6px;background:#222}
+.lbc canvas{max-width:100%;touch-action:none;border-radius:6px;background:#222}
+.nav{flex:none;width:44px;height:64px;border-radius:10px;border:none;background:rgba(255,255,255,.12);color:#fff;font-size:1.8rem;cursor:pointer}.nav:hover{background:rgba(255,255,255,.25)}
+.lbh{text-align:center;font-size:.72rem;color:#bdb6ad}
+@media(max-width:640px){header{padding:0 20px}.page{padding:28px 16px}.lgrid{grid-template-columns:repeat(2,1fr)}.nav{width:30px;height:52px;font-size:1.4rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<header><div class="logo">Frame<span>Split</span></div></header>
 <div class="page">
-
-  <div class="hero">
-    <h1>SPLIT ALL YOUR<br><span class="line2">COLLAGE FRAMES</span></h1>
-    <p>Upload as many collages as you like, pick one layout, and extract every frame from every image — then grab the whole batch as a single zip.</p>
-  </div>
-
-  <div class="steps-wrap">
-    <div class="step-upload">
-      <div class="step-label" data-n="1">Upload Collages</div>
-      <div id="drop-zone">
-        <input type="file" id="file-input" accept="image/*" multiple>
-        <div class="dz-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="3"/>
-            <path d="M3 15l5-5 4 4 3-3 6 6"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-          </svg>
-        </div>
-        <div class="dz-title">Drop collage images here</div>
-        <div class="dz-sub">Multiple files welcome · PNG · JPG · WEBP</div>
-      </div>
-      <div class="batch-strip" id="batch-strip"></div>
-    </div>
-
-    <div class="step-layouts">
-      <div class="step-label" data-n="2">Choose One Layout For All</div>
-      <div class="layouts-grid" id="layouts-grid"></div>
-    </div>
-  </div>
-
-  <!-- Preview -->
-  <div class="preview-section" id="preview-section">
-    <div class="section-title">PREVIEW &amp; CUT</div>
-
-    <div class="preview-toolbar">
-      <div class="gap-row">
-        <span>Border gap</span>
-        <input type="range" id="gap-slider" min="0" max="60" value="12">
-        <span class="gap-val" id="gap-val">12px</span>
-      </div>
-      <div class="fmt-btns">
-        <div class="fmt-btn active" data-fmt="png">PNG</div>
-        <div class="fmt-btn" data-fmt="jpeg">JPG</div>
-        <div class="fmt-btn" data-fmt="webp">WEBP</div>
-      </div>
-      <div class="quality-row" id="quality-row">
-        <span>Compression</span>
-        <input type="range" id="quality-slider" min="40" max="100" value="80">
-        <span class="gap-val" id="quality-val">80%</span>
-      </div>
-    </div>
-    <div class="quality-hint" id="quality-hint">PNG is lossless — it always saves at full size. Switch to <strong>WEBP</strong> to cut file size roughly in half with no visible quality loss.</div>
-    <div class="privacy-note" id="privacy-note">🔒 Exported frames carry no EXIF, GPS, or capture date/time — each is re-encoded from scratch and saved under a random filename, not the original one.</div>
-
-    <div class="collage-grid" id="collage-grid"></div>
-
-    <div class="action-row">
-      <button id="slice-btn">✂ EXTRACT ALL FRAMES</button>
-      <div class="progress-wrap" id="prog-wrap">
-        <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
-        <div class="progress-label" id="prog-label">0 / 0</div>
-      </div>
-      <button class="reset-btn" id="reset-btn">← Clear all &amp; start over</button>
-    </div>
-  </div>
-
-  <!-- Results -->
-  <div id="results-section">
-    <div class="section-title">EXTRACTED FRAMES</div>
-    <div class="results-bar">
-      <div class="results-info"><strong id="frame-count">0</strong> frames from <strong id="collage-count">0</strong> collages</div>
-      <button class="dl-all-btn" id="dl-all-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download All as ZIP
-      </button>
-    </div>
-    <div id="groups-wrap"></div>
-  </div>
-
+<div class="hero"><h1>SPLIT ALL YOUR<br><span>COLLAGE FRAMES</span></h1>
+<p>Upload collages, pick a layout (or let Auto-detect find the frames), tweak per image if needed, then export everything as one zip. Drop or paste images anywhere on the page.</p></div>
+<div class="steps">
+<div><div class="lbl">1 · Upload collages</div>
+<div id="drop" role="button" tabindex="0" aria-label="Choose collage images"><b>Drop, paste or click to add collages</b><small>Multiple files · PNG · JPG · WEBP</small></div>
+<input type="file" id="fi" accept="image/*" multiple hidden>
+<div class="strip" id="strip"></div><div id="errs"></div></div>
+<div><div class="lbl">2 · Default layout</div><div class="lgrid" id="lgrid"></div></div>
+</div>
+<div class="sec" id="prev">
+<div class="st">PREVIEW &amp; CUT</div>
+<div class="bar">
+<label>Gap <input type="range" id="gap" min="0" max="60" value="12"><b id="gapv">12px</b></label>
+<label>Outer margin <input type="range" id="mar" min="0" max="80" value="0"><b id="marv">0px</b></label>
+<div class="fmt" id="fmt"><button data-f="png" class="active" aria-pressed="true">PNG</button><button data-f="jpeg" aria-pressed="false">JPG</button><button data-f="webp" aria-pressed="false">WEBP</button></div>
+<label id="qrow">Quality <input type="range" id="q" min="40" max="100" value="80"><b id="qv">80%</b></label>
+<label><input type="checkbox" id="folders" checked> Folder per collage in ZIP</label>
+</div>
+<div class="note">🔒 Images are processed in your browser and never uploaded. Exports are re-encoded (no EXIF/GPS/date) and saved under random names. Gap/margin apply to preset layouts; Auto-detect uses the real gutters.</div>
+<div class="cgrid" id="cgrid"></div>
+<div class="acts"><button id="go">✂ EXTRACT ALL FRAMES</button>
+<div class="pw" id="pw"><div class="pb"><div id="pf"></div></div><span id="pl"></span></div>
+<button class="ghost" id="reset">← Clear all &amp; start over</button></div>
+</div>
+<div id="res">
+<div class="st">EXTRACTED FRAMES</div>
+<div class="warn" id="stale">Settings changed since this export — click Extract again to refresh (this resets crops and selections).</div>
+<div class="rb"><div><b id="fc">0</b> frames selected from <b id="cn">0</b> collages · click a frame to enlarge or crop</div><button class="dl" id="dlall">Download all as ZIP</button></div>
+<div id="groups"></div></div>
 </div>
 
+<div id="lb" hidden role="dialog" aria-modal="true" aria-label="Frame preview">
+<div class="lbbox" id="lbbox" tabindex="-1">
+<div class="lbtop"><span id="lbt"></span>
+<div class="lbr">
+<label class="ck"><input type="checkbox" id="lbsel"> Include in export</label>
+<button class="lbb" id="lbcrop">✂ Crop</button>
+<button class="lbb" id="lbundo">↺ Reset crop</button>
+<button class="lbb pri" id="lbapply">✓ Apply crop</button>
+<button class="lbb" id="lbcancel">Cancel</button>
+<button class="lbb" id="lbsave">↓ Save</button>
+<button class="lbb" id="lbx" aria-label="Close">✕</button>
+</div></div>
+<div class="lbstage"><button class="nav" id="lbp" aria-label="Previous frame">‹</button>
+<div class="lbc"><img id="lbimg" alt=""><canvas id="lbcv" tabindex="-1"></canvas></div>
+<button class="nav" id="lbn" aria-label="Next frame">›</button></div>
+<div class="lbh" id="lbh"></div>
+</div></div>
+
 <script>
-// ─── LAYOUT DEFINITIONS ───────────────────────────────────────────
-const LAYOUTS = [
-  {
-    id:'ls-3eq', name:'3 Equal', ratio:'16:9', orient:'Landscape', frames:3,
-    diag:{type:'cols3', portrait:false},
-    getFrames(W,H,g){
-      const w=Math.floor((W-2*g)/3);
-      return [
-        {x:0,        y:0,w:w,            h:H},
-        {x:w+g,      y:0,w:w,            h:H},
-        {x:2*w+2*g,  y:0,w:W-(2*w+2*g), h:H},
-      ];
-    }
-  },
-  {
-    id:'ls-3big', name:'1 Big+2', ratio:'16:9', orient:'Landscape', frames:3,
-    diag:{type:'ls-3big', portrait:false},
-    getFrames(W,H,g){
-      const bigW=Math.floor(W*0.55);
-      const smW=W-bigW-g;
-      const smH=Math.floor((H-g)/2);
-      return [
-        {x:0,       y:0,      w:bigW, h:H},
-        {x:bigW+g,  y:0,      w:smW,  h:smH},
-        {x:bigW+g,  y:smH+g,  w:smW,  h:H-smH-g},
-      ];
-    }
-  },
-  {
-    id:'ls-4eq', name:'4 Grid', ratio:'16:9', orient:'Landscape', frames:4,
-    diag:{type:'grid2x2', portrait:false},
-    getFrames(W,H,g){
-      const hw=Math.floor((W-g)/2), hh=Math.floor((H-g)/2);
-      return [
-        {x:0,    y:0,    w:hw,       h:hh},
-        {x:hw+g, y:0,    w:W-hw-g,   h:hh},
-        {x:0,    y:hh+g, w:hw,       h:H-hh-g},
-        {x:hw+g, y:hh+g, w:W-hw-g,   h:H-hh-g},
-      ];
-    }
-  },
-  {
-    id:'ls-4cols', name:'4 Strips', ratio:'16:9', orient:'Landscape', frames:4,
-    diag:{type:'cols4', portrait:false},
-    getFrames(W,H,g){
-      const w=Math.floor((W-3*g)/4);
-      return [
-        {x:0,           y:0,w:w,             h:H},
-        {x:w+g,         y:0,w:w,             h:H},
-        {x:2*(w+g),     y:0,w:w,             h:H},
-        {x:3*(w+g),     y:0,w:W-3*(w+g),     h:H},
-      ];
-    }
-  },
-  {
-    id:'pt-3eq', name:'3 Equal', ratio:'9:16', orient:'Portrait', frames:3,
-    diag:{type:'rows3', portrait:true},
-    getFrames(W,H,g){
-      const h=Math.floor((H-2*g)/3);
-      return [
-        {x:0,y:0,           w:W,h:h},
-        {x:0,y:h+g,         w:W,h:h},
-        {x:0,y:2*h+2*g,     w:W,h:H-(2*h+2*g)},
-      ];
-    }
-  },
-  {
-    id:'pt-3big', name:'1 Big+2', ratio:'9:16', orient:'Portrait', frames:3,
-    diag:{type:'pt-3big', portrait:true},
-    getFrames(W,H,g){
-      const bigH=Math.floor(H*0.55);
-      const smH=H-bigH-g;
-      const smW=Math.floor((W-g)/2);
-      return [
-        {x:0,     y:0,       w:W,         h:bigH},
-        {x:0,     y:bigH+g,  w:smW,       h:smH},
-        {x:smW+g, y:bigH+g,  w:W-smW-g,   h:smH},
-      ];
-    }
-  },
-  {
-    id:'pt-4eq', name:'4 Grid', ratio:'9:16', orient:'Portrait', frames:4,
-    diag:{type:'grid2x2', portrait:true},
-    getFrames(W,H,g){
-      const hw=Math.floor((W-g)/2), hh=Math.floor((H-g)/2);
-      return [
-        {x:0,    y:0,    w:hw,      h:hh},
-        {x:hw+g, y:0,    w:W-hw-g,  h:hh},
-        {x:0,    y:hh+g, w:hw,      h:H-hh-g},
-        {x:hw+g, y:hh+g, w:W-hw-g,  h:H-hh-g},
-      ];
-    }
-  },
-  {
-    id:'pt-4rows', name:'4 Strips', ratio:'9:16', orient:'Portrait', frames:4,
-    diag:{type:'rows4', portrait:true},
-    getFrames(W,H,g){
-      const h=Math.floor((H-3*g)/4);
-      return [
-        {x:0,y:0,          w:W,h:h},
-        {x:0,y:h+g,        w:W,h:h},
-        {x:0,y:2*(h+g),    w:W,h:h},
-        {x:0,y:3*(h+g),    w:W,h:H-3*(h+g)},
-      ];
-    }
-  },
-];
+const col=n=>(W,H,g)=>{const w=Math.floor((W-(n-1)*g)/n);return Array.from({length:n},(_,i)=>({x:i*(w+g),y:0,w:i==n-1?W-i*(w+g):w,h:H}))};
+const row=n=>(W,H,g)=>{const h=Math.floor((H-(n-1)*g)/n);return Array.from({length:n},(_,i)=>({x:0,y:i*(h+g),w:W,h:i==n-1?H-i*(h+g):h}))};
+const grid=(W,H,g)=>{const a=Math.floor((W-g)/2),b=Math.floor((H-g)/2);return[{x:0,y:0,w:a,h:b},{x:a+g,y:0,w:W-a-g,h:b},{x:0,y:b+g,w:a,h:H-b-g},{x:a+g,y:b+g,w:W-a-g,h:H-b-g}]};
+const lsBig=(W,H,g)=>{const b=Math.floor(W*.55),s=Math.floor((H-g)/2);return[{x:0,y:0,w:b,h:H},{x:b+g,y:0,w:W-b-g,h:s},{x:b+g,y:s+g,w:W-b-g,h:H-s-g}]};
+const ptBig=(W,H,g)=>{const b=Math.floor(H*.55),s=Math.floor((W-g)/2);return[{x:0,y:0,w:W,h:b},{x:0,y:b+g,w:s,h:H-b-g},{x:s+g,y:b+g,w:W-s-g,h:H-b-g}]};
+const LAYOUTS=[
+{id:'ls-3eq',name:'3 Equal',o:'L',n:3,d:['1fr 1fr 1fr','1fr',[0,0,0]],f:col(3)},
+{id:'ls-3big',name:'1 Big+2',o:'L',n:3,d:['55fr 44fr','1fr 1fr',['1/3',0,0],'r'],f:lsBig},
+{id:'ls-4eq',name:'4 Grid',o:'L',n:4,d:['1fr 1fr','1fr 1fr',[0,0,0,0]],f:grid},
+{id:'ls-4c',name:'4 Strips',o:'L',n:4,d:['1fr 1fr 1fr 1fr','1fr',[0,0,0,0]],f:col(4)},
+{id:'pt-3eq',name:'3 Equal',o:'P',n:3,d:['1fr','1fr 1fr 1fr',[0,0,0]],f:row(3)},
+{id:'pt-3big',name:'1 Big+2',o:'P',n:3,d:['1fr 1fr','55fr 44fr',['1/3',0,0],'c'],f:ptBig},
+{id:'pt-4eq',name:'4 Grid',o:'P',n:4,d:['1fr 1fr','1fr 1fr',[0,0,0,0]],f:grid},
+{id:'pt-4r',name:'4 Strips',o:'P',n:4,d:['1fr','1fr 1fr 1fr 1fr',[0,0,0,0]],f:row(4)},
+{id:'auto',name:'Auto-detect frames',o:null,auto:true}];
+const $=id=>document.getElementById(id);
+let collages=[],groups=[],selId='ls-3eq',fmt='png',quality=.8,gap=12,margin=0,idc=0;
+const used=new Set();
+const rnd=n=>{let s;do{s='';for(let i=0;i<n;i++)s+='abcdefghijklmnopqrstuvwxyz'[Math.random()*26|0]}while(used.has(s));used.add(s);return s};
+const EXT={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
+const lay=id=>LAYOUTS.find(l=>l.id===id)||LAYOUTS[0];
+// settings persistence
+function save(){try{localStorage.setItem('fs',JSON.stringify({selId,fmt,quality,gap,margin,fo:$('folders').checked}))}catch(e){}}
+function load(){try{const s=JSON.parse(localStorage.getItem('fs')||'{}');if(s.selId&&LAYOUTS.some(l=>l.id===s.selId))selId=s.selId;if(['png','jpeg','webp'].includes(s.fmt))fmt=s.fmt;
+if(s.quality)quality=s.quality;if(s.gap!=null)gap=s.gap;if(s.margin!=null)margin=s.margin;if(s.fo!=null)$('folders').checked=s.fo}catch(e){}
+$('gap').value=gap;$('mar').value=margin;$('q').value=Math.round(quality*100);syncLabels()}
+function syncLabels(){$('gapv').textContent=gap+'px';$('marv').textContent=margin+'px';$('qv').textContent=Math.round(quality*100)+'%';
+document.querySelectorAll('#fmt button').forEach(b=>{const a=b.dataset.f===fmt;b.classList.toggle('active',a);b.setAttribute('aria-pressed',a)});
+$('qrow').style.opacity=fmt==='png'?.4:1;$('qrow').style.pointerEvents=fmt==='png'?'none':''}
+// layout cards
+function diagram(l){const el=document.createElement('div');el.className='dg'+(l.o==='P'?' p':'');const[c,r,cells,sp]=l.d;
+el.style.gridTemplateColumns=c;el.style.gridTemplateRows=r;cells.forEach(s=>{const i=document.createElement('i');if(s)i.style[sp==='r'?'gridRow':'gridColumn']=s;el.appendChild(i)});return el}
+function buildLayouts(){const g=$('lgrid');g.innerHTML='';LAYOUTS.forEach(l=>{const b=document.createElement('button');b.type='button';
+b.className='lc'+(l.auto?' auto':'')+(l.id===selId?' active':'');b.setAttribute('aria-pressed',l.id===selId);
+if(!l.auto)b.appendChild(diagram(l));const n=document.createElement('div');n.className='ln';
+n.textContent=l.auto?'✨ '+l.name+' (finds gutters in each image)':l.name+' · '+(l.o==='L'?'16:9':'9:16');b.appendChild(n);
+b.onclick=()=>{selId=l.id;save();buildLayouts();renderGrid();stale()};g.appendChild(b)})}
+// frames
+function framesFor(c){const l=lay(c.layoutId||selId);if(l.auto)return c.auto||[{x:0,y:0,w:c.W,h:c.H}];
+const m=Math.min(margin,Math.floor(Math.min(c.W,c.H)/4));return l.f(c.W-2*m,c.H-2*m,gap).map(f=>({x:f.x+m,y:f.y+m,w:f.w,h:f.h}))}
+// auto-detect gutters: find low-variance rows/columns (uniform color) and cut between them
+function detect(img){const W=img.naturalWidth,H=img.naturalHeight,s=Math.min(1,500/Math.max(W,H)),w=Math.max(1,Math.round(W*s)),h=Math.max(1,Math.round(H*s));
+const cv=document.createElement('canvas');cv.width=w;cv.height=h;const cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(img,0,0,w,h);
+let d;try{d=cx.getImageData(0,0,w,h).data}catch(e){return null}
+const L=new Float32Array(w*h);for(let i=0;i<w*h;i++)L[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+const segs=(len,n,at)=>{const solid=[];for(let i=0;i<len;i++){let m=0,m2=0;for(let k=0;k<n;k++){const v=at(i,k);m+=v;m2+=v*v}m/=n;solid.push(Math.sqrt(Math.max(0,m2/n-m*m))>=7)}
+const out=[];let a=-1;for(let i=0;i<=len;i++){const on=i<len&&solid[i];if(on&&a<0)a=i;if(!on&&a>=0){if(i-a>=len*.08)out.push([a,i]);a=-1}}return out};
+const fr=[];for(const[x0,x1]of segs(w,h,(x,y)=>L[y*w+x]))for(const[y0,y1]of segs(h,x1-x0,(y,k)=>L[y*w+x0+k]))
+fr.push({x:Math.round(x0/s),y:Math.round(y0/s),w:Math.min(W,Math.round(x1/s))-Math.round(x0/s),h:Math.min(H,Math.round(y1/s))-Math.round(y0/s)});
+fr.sort((a,b)=>Math.abs(a.y-b.y)>H*.05?a.y-b.y:a.x-b.x);return fr.length>1?fr:null}
+// upload (sequential so order matches selection)
+function showErr(m){const e=document.createElement('div');e.className='err';e.textContent=m;$('errs').appendChild(e);setTimeout(()=>e.remove(),6000)}
+function loadFile(f){return new Promise(res=>{const url=URL.createObjectURL(f),img=new Image();
+img.onload=()=>{const sc=Math.min(1,480/img.naturalWidth),p=document.createElement('canvas');p.width=Math.round(img.naturalWidth*sc);p.height=Math.round(img.naturalHeight*sc);
+p.getContext('2d').drawImage(img,0,0,p.width,p.height);
+collages.push({id:'c'+idc++,name:f.name.replace(/\.[^/.]+$/,''),alias:rnd(9),img,url,prev:p,W:img.naturalWidth,H:img.naturalHeight,layoutId:'',auto:detect(img)});res()};
+img.onerror=()=>{URL.revokeObjectURL(url);showErr(`Couldn't load "${f.name}" — unsupported or corrupt image.`);res()};img.src=url})}
+async function addFiles(list){const fs=[...list].filter(f=>f.type.startsWith('image/'));if(!fs.length)return;
+for(const f of fs)await loadFile(f);renderStrip();renderGrid();$('prev').classList.add('on');stale()}
+$('drop').onclick=()=>$('fi').click();$('drop').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('fi').click()}};
+$('fi').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+document.addEventListener('dragover',e=>{e.preventDefault();$('drop').classList.add('over')});
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget)$('drop').classList.remove('over')});
+document.addEventListener('drop',e=>{e.preventDefault();$('drop').classList.remove('over');if($('lb').hidden)addFiles(e.dataTransfer.files)});
+document.addEventListener('paste',e=>{if($('lb').hidden)addFiles([...(e.clipboardData?.files||[])])});
+function removeC(id){const c=collages.find(x=>x.id===id);if(c)URL.revokeObjectURL(c.url);collages=collages.filter(x=>x.id!==id);renderStrip();renderGrid();stale();
+if(!collages.length){$('prev').classList.remove('on');clearResults()}}
+function renderStrip(){const s=$('strip');s.innerHTML='';collages.forEach(c=>{const t=document.createElement('div');t.className='thumb';const i=document.createElement('img');i.src=c.url;i.alt=c.name;
+const b=document.createElement('button');b.textContent='✕';b.setAttribute('aria-label','Remove '+c.name);b.onclick=()=>removeC(c.id);t.append(i,b);s.appendChild(t)})}
+// preview grid
+function renderGrid(){const g=$('cgrid');g.innerHTML='';if(!collages.length){g.textContent='No collages yet.';return}
+collages.forEach(c=>{const card=document.createElement('div');card.className='cc';const w=document.createElement('div');w.className='cw';
+const cv=document.createElement('canvas'),ov=document.createElement('canvas');c.ov=ov;cv.width=ov.width=c.prev.width;cv.height=ov.height=c.prev.height;cv.getContext('2d').drawImage(c.prev,0,0);
+w.append(cv,ov);const f=document.createElement('div');f.className='cf';
+const r=document.createElement('div');r.className='r';const n=document.createElement('span');n.className='n';n.textContent=c.name;const d=document.createElement('span');d.className='d';d.textContent=`${c.W}×${c.H}`;r.append(n,d);
+const sel=document.createElement('select');sel.setAttribute('aria-label','Layout for '+c.name);
+[['', 'Use default layout']].concat(LAYOUTS.map(l=>[l.id,l.auto?'Auto-detect':l.name+' · '+(l.o==='L'?'16:9':'9:16')])).forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o)});
+sel.value=c.layoutId;sel.onchange=()=>{c.layoutId=sel.value;renderGrid();stale()};
+f.append(r,sel);const l=lay(c.layoutId||selId);
+if(l.auto&&!c.auto){const x=document.createElement('div');x.className='w';x.textContent='⚠ No gutters detected — whole image will be one frame.';f.appendChild(x)}
+else if(l.o&&(l.o==='L')!==(c.W>=c.H)){const x=document.createElement('div');x.className='w';x.textContent=`⚠ ${l.o==='L'?'Landscape':'Portrait'} layout on a ${c.W>=c.H?'landscape':'portrait'} image.`;f.appendChild(x)}
+card.append(w,f);g.appendChild(card);drawOv(c)})}
+function drawOv(c){const o=c.ov;if(!o)return;const x=o.getContext('2d'),sx=o.width/c.W,sy=o.height/c.H;x.clearRect(0,0,o.width,o.height);x.fillStyle='rgba(0,0,0,.25)';x.fillRect(0,0,o.width,o.height);
+framesFor(c).forEach((f,i)=>{const px=f.x*sx,py=f.y*sy,pw=f.w*sx,ph=f.h*sy;x.clearRect(px,py,pw,ph);x.strokeStyle='#ff4500';x.lineWidth=2;x.strokeRect(px+1,py+1,pw-2,ph-2);
+x.beginPath();x.arc(px+20,py+20,11,0,7);x.fillStyle='#ff4500';x.fill();x.fillStyle='#fff';x.font='bold 11px Outfit,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(i+1,px+20,py+20)})}
+let raf=0;const redraw=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>collages.forEach(drawOv))};
+// controls
+$('gap').oninput=e=>{gap=+e.target.value;syncLabels();redraw();save();stale()};
+$('mar').oninput=e=>{margin=+e.target.value;syncLabels();redraw();save();stale()};
+$('q').oninput=e=>{quality=e.target.value/100;syncLabels();save();stale()};
+$('folders').onchange=save;
+$('fmt').onclick=e=>{const b=e.target.closest('button');if(!b)return;fmt=b.dataset.f;syncLabels();save();stale()};
+function stale(){if(groups.length)$('res').classList.add('stale')}
+// extract
+const toBlob=(cv,m,q)=>new Promise(r=>cv.toBlob(r,m,q));
+$('go').onclick=async()=>{if(!collages.length)return;const btn=$('go');btn.disabled=true;$('pw').classList.add('on');clearResults();used.clear();collages.forEach(c=>c.alias=rnd(9));
+const mime={png:'image/png',jpeg:'image/jpeg',webp:'image/webp'}[fmt];const plan=collages.map(c=>({c,fr:framesFor(c)}));
+const total=plan.reduce((a,p)=>a+p.fr.length,0),pad=String(total).length;let done=0,seq=0,skipped=0,mism=false;
+for(const{c,fr}of plan){const g={name:c.name,alias:c.alias,tiles:[]};
+for(const f of fr){const x=Math.max(0,f.x),y=Math.max(0,f.y),w=Math.min(f.w,c.W-x),h=Math.min(f.h,c.H-y);
+if(w<=0||h<=0){skipped++;continue}
+const t=document.createElement('canvas');t.width=w;t.height=h;t.getContext('2d').drawImage(c.img,x,y,w,h,0,0,w,h);
+const blob=await toBlob(t,mime,quality);if(!blob){skipped++;continue}
+if(blob.type!==mime)mism=true;
+g.tiles.push({blob,url:URL.createObjectURL(blob),name:`${String(++seq).padStart(pad,'0')}_${rnd(8)}.${EXT[blob.type]||'png'}`,w,h,c,g,mime,src:{x,y,w,h},orig:{x,y,w,h},sel:true});
+$('pf').style.width=Math.round(++done/total*100)+'%';$('pl').textContent=`${done} / ${total}`;await new Promise(r=>requestAnimationFrame(r))}
+groups.push(g)}
+btn.disabled=false;$('pw').classList.remove('on');$('pf').style.width='0';renderResults(skipped,mism)};
+function clearResults(){closeLB();groups.forEach(g=>g.tiles.forEach(t=>URL.revokeObjectURL(t.url)));groups=[];$('res').classList.remove('on','stale');$('groups').innerHTML=''}
+function download(blob,name){const a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+const fmtSize=b=>b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB';
+// re-encode one tile from the original image using its current crop rectangle
+async function reencode(t){const{x,y,w,h}=t.src,cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(t.c.img,x,y,w,h,0,0,w,h);
+const blob=await toBlob(cv,t.mime,quality);if(!blob){showErr('Could not encode the cropped frame.');return false}
+URL.revokeObjectURL(t.url);t.blob=blob;t.url=URL.createObjectURL(blob);t.w=w;t.h=h;t.name=t.name.replace(/\.\w+$/,'.'+(EXT[blob.type]||'png'));return true}
+const cropped=t=>['x','y','w','h'].some(k=>t.src[k]!==t.orig[k]);
+function refreshTiles(){let n=0,cn=0;groups.forEach(g=>{const k=g.tiles.filter(t=>t.sel).length;n+=k;if(k)cn++;
+if(g.lbl)g.lbl.textContent=`${g.name} — ${k} of ${g.tiles.length} frames selected`;if(g.zb)g.zb.disabled=!k;
+g.tiles.forEach((t,i)=>{if(!t.card)return;t.card.classList.toggle('off',!t.sel);t.cb.checked=t.sel;if(t.img.getAttribute('src')!==t.url)t.img.src=t.url;
+t.meta.textContent=`${t.w}×${t.h} · ${fmtSize(t.blob.size)}${cropped(t)?' · cropped':''}`})});
+$('fc').textContent=n;$('cn').textContent=cn;$('dlall').disabled=!n}
+function renderResults(skipped,mism){const wrap=$('groups');wrap.innerHTML='';
+const msg=(t)=>{const w=document.createElement('div');w.className='warn';w.textContent=t;wrap.appendChild(w)};
+if(skipped)msg(`⚠ ${skipped} frame${skipped>1?'s':''} skipped — empty after gap/margin, or the browser couldn't encode it.`);
+if(mism)msg(`⚠ This browser can't encode ${fmt.toUpperCase()}, so some files were saved as PNG instead (extensions match the real format).`);
+groups.forEach(g=>{if(!g.tiles.length)return;const b=document.createElement('div');b.className='gb';
+const t=document.createElement('div');t.className='gt';g.lbl=document.createElement('span');
+const ga=document.createElement('div');ga.className='ga';
+const sa=document.createElement('button');sa.textContent='Select all / none';sa.onclick=()=>{const on=!g.tiles.every(x=>x.sel);g.tiles.forEach(x=>x.sel=on);refreshTiles()};
+const zb=document.createElement('button');zb.textContent='↓ This collage (ZIP)';zb.onclick=()=>zipGroups([g],zb,false);g.zb=zb;
+ga.append(sa,zb);t.append(g.lbl,ga);b.appendChild(t);
+const tg=document.createElement('div');tg.className='tg';
+g.tiles.forEach((tile,i)=>{const c=document.createElement('div');c.className='tc';tile.card=c;
+const im=document.createElement('img');im.alt='Frame '+(i+1);im.title='Click to enlarge or crop';im.onclick=()=>openLB(tile);im.tabIndex=0;im.setAttribute('role','button');im.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();openLB(tile)}};tile.img=im;
+const f=document.createElement('div');f.className='tf';const d=document.createElement('div');d.textContent='Frame '+(i+1);const sm=document.createElement('small');tile.meta=sm;d.appendChild(sm);
+const ck=document.createElement('label');ck.className='ck';const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('aria-label','Include frame '+(i+1)+' in export');cb.onchange=()=>{tile.sel=cb.checked;refreshTiles()};tile.cb=cb;ck.append(cb,'Include');
+const sv=document.createElement('button');sv.textContent='↓ Save';sv.onclick=()=>download(tile.blob,tile.name);f.append(d,ck,sv);c.append(im,f);tg.appendChild(c)});
+b.appendChild(tg);wrap.appendChild(b)});
+refreshTiles();$('res').classList.remove('stale');$('res').classList.add('on');$('res').scrollIntoView({behavior:'smooth'})}
+async function zipGroups(gs,btn,all){const files=gs.flatMap(g=>g.tiles.filter(t=>t.sel).map(t=>({g,t})));if(!files.length)return;
+const old=btn.textContent;btn.disabled=true;const z=new JSZip(),fo=$('folders').checked;
+files.forEach(({g,t})=>z.file((fo?g.alias+'/':'')+t.name,t.blob));
+try{const blob=await z.generateAsync({type:'blob',compression:'STORE'},m=>{btn.textContent=`Zipping ${Math.round(m.percent)}%`});download(blob,rnd(11)+'.zip')}
+catch(e){showErr('ZIP failed: '+e.message)}btn.textContent=old;btn.disabled=false;refreshTiles()}
+$('dlall').onclick=()=>{if(groups.length)zipGroups(groups,$('dlall'),true)};
+$('reset').onclick=()=>{collages.forEach(c=>URL.revokeObjectURL(c.url));collages=[];clearResults();renderStrip();renderGrid();$('prev').classList.remove('on')};
 
-// ─── STATE ────────────────────────────────────────────────────────
-let collages = [];      // { id, name, alias, img, W, H }
-let selectedLayout = LAYOUTS[0];
-let outputFmt = 'png';
-let outputQuality = 0.8;
-let gapPx = 12;
-let resultGroups = [];  // { alias, tiles:[{dataUrl,name,w,h}] }
-let idCounter = 0;
-const usedNames = new Set();
+// ===== Lightbox + crop =====
+let lbT=null,lbOpener=null,cropMode=false,csel=null,cdrag=null,csx=1,csy=1;const MINC=12;
+const lbList=()=>groups.flatMap(g=>g.tiles);
+function openLB(t){lbOpener=document.activeElement;lbT=t;cropMode=false;$('lb').hidden=false;document.body.style.overflow='hidden';lbShow()}
+function closeLB(){if(!lbT&&$('lb').hidden)return;$('lb').hidden=true;lbT=null;cropMode=false;cdrag=null;document.body.style.overflow='';if(lbOpener&&lbOpener.isConnected&&lbOpener.focus)lbOpener.focus({preventScroll:true});lbOpener=null}
+function lbShow(){const t=lbT;if(!t)return;const l=lbList(),n=t.g.tiles.indexOf(t)+1;
+$('lbt').textContent=`${t.g.name} · Frame ${n} · ${t.w}×${t.h}${cropped(t)?' (cropped)':''} · ${l.indexOf(t)+1}/${l.length}${t.sel?'':' · EXCLUDED'}`;
+$('lbimg').style.opacity=t.sel?1:.4;
+$('lbsel').checked=t.sel;$('lbsel').disabled=cropMode;
+$('lbimg').hidden=cropMode;$('lbcv').hidden=!cropMode;
+$('lbcrop').hidden=cropMode;$('lbundo').hidden=cropMode||!cropped(t);$('lbapply').hidden=!cropMode;$('lbcancel').hidden=!cropMode;$('lbsave').hidden=cropMode;
+$('lbp').hidden=$('lbn').hidden=cropMode||l.length<2;
+$('lbh').textContent=cropMode?'Drag to draw a crop box · drag edges or corners to adjust · drag inside to move · Enter = apply · Esc = cancel':'← → move between frames · Space = include / exclude · C = crop · Esc = close';
+if(cropMode)drawCrop();else $('lbimg').src=t.url;
+(cropMode?$('lbcv'):$('lbbox')).focus({preventScroll:true})}
+function step(d){const l=lbList();if(!l.length)return;lbT=l[(l.indexOf(lbT)+d+l.length)%l.length];lbShow()}
+function startCrop(){const t=lbT,o=t.orig,cv=$('lbcv');
+const sc=Math.min((Math.min(innerWidth*.82,1000))/o.w,(innerHeight-190)/o.h,3);
+cv.width=Math.max(40,Math.round(o.w*sc));cv.height=Math.max(40,Math.round(o.h*sc));csx=cv.width/o.w;csy=cv.height/o.h;
+csel={x:(t.src.x-o.x)*csx,y:(t.src.y-o.y)*csy,w:t.src.w*csx,h:t.src.h*csy};cropMode=true;lbShow()}
+function drawCrop(){const t=lbT,o=t.orig,cv=$('lbcv'),x=cv.getContext('2d'),s=csel;
+x.clearRect(0,0,cv.width,cv.height);x.drawImage(t.c.img,o.x,o.y,o.w,o.h,0,0,cv.width,cv.height);
+x.save();x.fillStyle='rgba(0,0,0,.6)';x.beginPath();x.rect(0,0,cv.width,cv.height);x.rect(s.x,s.y,s.w,s.h);x.fill('evenodd');x.restore();
+x.strokeStyle='#ff4500';x.lineWidth=2;x.strokeRect(s.x,s.y,s.w,s.h);x.fillStyle='#ff4500';
+[[0,0],[.5,0],[1,0],[0,.5],[1,.5],[0,1],[.5,1],[1,1]].forEach(([a,b])=>x.fillRect(s.x+s.w*a-4,s.y+s.h*b-4,8,8));
+const lab=`${Math.round(s.w/csx)}×${Math.round(s.h/csy)}`;x.font='600 12px Outfit,sans-serif';const tw=x.measureText(lab).width+12,ly=s.y>22?s.y-20:s.y+4;
+x.fillStyle='#ff4500';x.fillRect(s.x,ly,tw,18);x.fillStyle='#fff';x.textBaseline='middle';x.textAlign='left';x.fillText(lab,s.x+6,ly+9)}
+function cpos(e){const cv=$('lbcv'),r=cv.getBoundingClientRect();return{x:Math.min(cv.width,Math.max(0,(e.clientX-r.left)*cv.width/r.width)),y:Math.min(cv.height,Math.max(0,(e.clientY-r.top)*cv.height/r.height))}}
+function chit(p){const{x,y,w,h}=csel,m=10;if(p.x<x-m||p.x>x+w+m||p.y<y-m||p.y>y+h+m)return'new';
+const l=Math.abs(p.x-x)<m,r=Math.abs(p.x-x-w)<m,tp=Math.abs(p.y-y)<m,b=Math.abs(p.y-y-h)<m;const k=(tp?'n':b?'s':'')+(l?'w':r?'e':'');if(k)return k;const cv=$('lbcv');return(w>=cv.width-2&&h>=cv.height-2)?'new':'move'}
+const CUR={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',nw:'nwse-resize',se:'nwse-resize',ne:'nesw-resize',sw:'nesw-resize',move:'move',new:'crosshair'};
+const lbcv=$('lbcv');
+lbcv.addEventListener('pointerdown',e=>{if(!cropMode)return;e.preventDefault();const p=cpos(e),m=chit(p);lbcv.setPointerCapture(e.pointerId);
+cdrag={m,p0:p,s0:{...csel}};if(m==='new')csel={x:p.x,y:p.y,w:0,h:0}});
+lbcv.addEventListener('pointermove',e=>{if(!cropMode)return;const p=cpos(e),cv=lbcv;
+if(!cdrag){cv.style.cursor=CUR[chit(p)];return}
+const{m,p0,s0}=cdrag,dx=p.x-p0.x,dy=p.y-p0.y,W=cv.width,H=cv.height,cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+if(m==='new')csel={x:Math.min(p0.x,p.x),y:Math.min(p0.y,p.y),w:Math.abs(p.x-p0.x),h:Math.abs(p.y-p0.y)};
+else if(m==='move')csel={x:cl(s0.x+dx,0,W-s0.w),y:cl(s0.y+dy,0,H-s0.h),w:s0.w,h:s0.h};
+else{let x1=s0.x,y1=s0.y,x2=s0.x+s0.w,y2=s0.y+s0.h;
+if(m.includes('w'))x1=cl(s0.x+dx,0,x2-MINC);if(m.includes('e'))x2=cl(x2+dx,x1+MINC,W);
+if(m.includes('n'))y1=cl(s0.y+dy,0,y2-MINC);if(m.includes('s'))y2=cl(y2+dy,y1+MINC,H);
+csel={x:x1,y:y1,w:x2-x1,h:y2-y1}}
+drawCrop()});
+const endDrag=()=>{if(cdrag&&(csel.w<MINC||csel.h<MINC)){csel={...cdrag.s0};drawCrop()}cdrag=null};
+lbcv.addEventListener('pointerup',endDrag);lbcv.addEventListener('pointercancel',endDrag);
+async function applyCrop(){const t=lbT,o=t.orig;if(!csel||csel.w<MINC||csel.h<MINC)return;
+const x=o.x+Math.round(csel.x/csx),y=o.y+Math.round(csel.y/csy);
+const w=Math.max(1,Math.min(Math.round(csel.w/csx),o.x+o.w-x)),h=Math.max(1,Math.min(Math.round(csel.h/csy),o.y+o.h-y));
+const prev=t.src;t.src={x,y,w,h};$('lbapply').disabled=true;const ok=await reencode(t);$('lbapply').disabled=false;
+if(!ok)t.src=prev;cropMode=false;refreshTiles();lbShow()}
+async function resetCrop(){const t=lbT;t.src={...t.orig};if(await reencode(t)){refreshTiles();lbShow()}}
+$('lbx').onclick=closeLB;$('lbp').onclick=()=>step(-1);$('lbn').onclick=()=>step(1);
+$('lb').onclick=e=>{if(e.target===$('lb')&&!cropMode)closeLB()};
+$('lbsel').onchange=e=>{lbT.sel=e.target.checked;refreshTiles()};
+$('lbcrop').onclick=startCrop;$('lbapply').onclick=applyCrop;$('lbcancel').onclick=()=>{cropMode=false;lbShow()};$('lbundo').onclick=resetCrop;
+let swx=null;const lbi=$('lbimg');
+lbi.addEventListener('touchstart',e=>{swx=e.touches[0].clientX},{passive:true});
+lbi.addEventListener('touchend',e=>{if(swx==null)return;const dx=e.changedTouches[0].clientX-swx;swx=null;if(Math.abs(dx)>50)step(dx<0?1:-1)});
+$('lbsave').onclick=()=>download(lbT.blob,lbT.name);
+document.addEventListener('keydown',e=>{if($('lb').hidden||!lbT)return;const tag=e.target.tagName,k=e.key;
+if(k==='Escape'){e.preventDefault();cropMode?($('lbcancel').click()):closeLB();return}
+if(cropMode){if(k==='Enter'&&tag!=='BUTTON'){e.preventDefault();applyCrop()}return}
+if(k==='ArrowLeft'){e.preventDefault();step(-1)}else if(k==='ArrowRight'){e.preventDefault();step(1)}
+else if((k==='c'||k==='C')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();startCrop()}
+else if(k===' '&&tag!=='INPUT'&&tag!=='BUTTON'){e.preventDefault();lbT.sel=!lbT.sel;refreshTiles();lbShow()}});
 
-// Random lowercase filename generator — output files carry no trace of the
-// original filename, capture date/time, or any other embedded metadata.
-// Re-drawing onto <canvas> and re-encoding via toDataURL already discards
-// all EXIF (camera model, GPS, timestamp, etc.) — only raw pixels remain.
-function randStr(len = 11) {
-  const chars = 'abcdefghijklmnopqrstuvwxyz';
-  let s = '';
-  do {
-    s = '';
-    for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  } while (usedNames.has(s));
-  usedNames.add(s);
-  return s;
-}
-
-// ─── DIAGRAM BUILDER ──────────────────────────────────────────────
-function buildDiagram(layout) {
-  const d = layout.diag;
-  const el = document.createElement('div');
-  el.className = 'lc-diagram' + (d.portrait ? ' portrait' : '');
-  const t = d.type;
-  const configs = {
-    'cols3':   {cols:'1fr 1fr 1fr', rows:'1fr',           cells:[{},{},{}]},
-    'cols4':   {cols:'1fr 1fr 1fr 1fr', rows:'1fr',        cells:[{},{},{},{}]},
-    'rows3':   {cols:'1fr', rows:'1fr 1fr 1fr',            cells:[{},{},{}]},
-    'rows4':   {cols:'1fr', rows:'1fr 1fr 1fr 1fr',        cells:[{},{},{},{}]},
-    'grid2x2': {cols:'1fr 1fr', rows:'1fr 1fr',            cells:[{},{},{},{}]},
-    'ls-3big': {cols:'55fr 44fr', rows:'1fr 1fr',          cells:[{big:true,rowSpan:'1/3'},{},{}]},
-    'pt-3big': {cols:'1fr 1fr', rows:'55fr 44fr',          cells:[{big:true,colSpan:'1/3'},{},{}]},
-  };
-  const cfg = configs[t];
-  if(!cfg) return el;
-  el.style.gridTemplateColumns = cfg.cols;
-  el.style.gridTemplateRows    = cfg.rows;
-  cfg.cells.forEach(c => {
-    const div = document.createElement('div');
-    div.className = 'cell' + (c.big ? ' big' : '');
-    if(c.rowSpan) div.style.gridRow = c.rowSpan;
-    if(c.colSpan) div.style.gridColumn = c.colSpan;
-    el.appendChild(div);
-  });
-  return el;
-}
-
-function buildLayoutCards() {
-  const grid = document.getElementById('layouts-grid');
-  grid.innerHTML = '';
-  LAYOUTS.forEach(layout => {
-    const card = document.createElement('div');
-    card.className = 'layout-card' + (layout === selectedLayout ? ' active' : '');
-    card.dataset.id = layout.id;
-    card.appendChild(buildDiagram(layout));
-    const name  = document.createElement('div'); name.className = 'lc-name';  name.textContent = layout.name;
-    const ratio = document.createElement('div'); ratio.className = 'lc-ratio'; ratio.textContent = layout.ratio + ' · ' + layout.frames;
-    card.appendChild(name); card.appendChild(ratio);
-    card.addEventListener('click', () => selectLayout(layout));
-    grid.appendChild(card);
-  });
-}
-
-function selectLayout(layout) {
-  selectedLayout = layout;
-  document.querySelectorAll('.layout-card').forEach(c => c.classList.toggle('active', c.dataset.id === layout.id));
-  renderCollageGrid();
-}
-
-// ─── UPLOAD (multi) ───────────────────────────────────────────────
-const dropZone  = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
-dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over'); });
-dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.classList.remove('over');
-  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
-  files.forEach(loadImg);
-});
-fileInput.addEventListener('change', () => {
-  [...fileInput.files].forEach(loadImg);
-  fileInput.value = '';
-});
-
-function loadImg(file) {
-  const r = new FileReader();
-  r.onload = ev => {
-    const img = new Image();
-    img.onload = () => {
-      collages.push({
-        id: 'c' + (idCounter++),
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        alias: randStr(9),
-        img,
-        W: img.naturalWidth,
-        H: img.naturalHeight
-      });
-      renderBatchStrip();
-      renderCollageGrid();
-      document.getElementById('preview-section').classList.add('visible');
-    };
-    img.src = ev.target.result;
-  };
-  r.readAsDataURL(file);
-}
-
-function removeCollage(id) {
-  collages = collages.filter(c => c.id !== id);
-  renderBatchStrip();
-  renderCollageGrid();
-  if(collages.length === 0){
-    document.getElementById('preview-section').classList.remove('visible');
-    document.getElementById('results-section').classList.remove('visible');
-  }
-}
-
-function renderBatchStrip() {
-  const strip = document.getElementById('batch-strip');
-  strip.innerHTML = '';
-  collages.forEach(c => {
-    const thumb = document.createElement('div');
-    thumb.className = 'batch-thumb';
-    const im = document.createElement('img'); im.src = c.img.src;
-    const rm = document.createElement('button'); rm.className='bt-remove'; rm.textContent='✕';
-    rm.addEventListener('click', () => removeCollage(c.id));
-    const nm = document.createElement('div'); nm.className='bt-name'; nm.textContent = c.name;
-    thumb.appendChild(im); thumb.appendChild(rm); thumb.appendChild(nm);
-    strip.appendChild(thumb);
-  });
-  if(collages.length){
-    const add = document.createElement('div');
-    add.className = 'batch-add';
-    add.textContent = '+';
-    add.addEventListener('click', () => fileInput.click());
-    strip.appendChild(add);
-  }
-}
-
-// ─── PER-COLLAGE PREVIEW GRID (with overlay) ──────────────────────
-function renderCollageGrid() {
-  const grid = document.getElementById('collage-grid');
-  grid.innerHTML = '';
-  if(collages.length === 0){
-    grid.innerHTML = '<div class="empty-hint">No collages yet — upload one or more above.</div>';
-    return;
-  }
-  collages.forEach(c => {
-    const card = document.createElement('div');
-    card.className = 'collage-card';
-
-    const wrap = document.createElement('div');
-    wrap.className = 'cc-canvas-wrap';
-    const canvas = document.createElement('canvas');
-    const overlay = document.createElement('canvas');
-    overlay.className = 'cc-overlay';
-    wrap.appendChild(canvas);
-    wrap.appendChild(overlay);
-    card.appendChild(wrap);
-
-    const footer = document.createElement('div');
-    footer.className = 'cc-footer';
-    footer.innerHTML = `<span class="cc-name">${c.name}</span><span class="cc-dims">${c.W}×${c.H}</span>`;
-    card.appendChild(footer);
-
-    grid.appendChild(card);
-    drawCollagePreview(c, canvas, overlay);
-  });
-}
-
-function drawCollagePreview(c, canvas, overlay) {
-  const maxW = 460;
-  const scale = Math.min(1, maxW / c.W);
-  canvas.width  = c.W * scale;
-  canvas.height = c.H * scale;
-  overlay.width  = canvas.width;
-  overlay.height = canvas.height;
-  canvas.getContext('2d').drawImage(c.img, 0, 0, canvas.width, canvas.height);
-
-  const pW = canvas.width, pH = canvas.height;
-  const sx = pW / c.W, sy = pH / c.H;
-  const frames = selectedLayout.getFrames(c.W, c.H, gapPx);
-  const oc = overlay.getContext('2d');
-  oc.clearRect(0, 0, pW, pH);
-  oc.fillStyle = 'rgba(0,0,0,0.25)';
-  oc.fillRect(0, 0, pW, pH);
-
-  frames.forEach((f, i) => {
-    const px=f.x*sx, py=f.y*sy, pw=f.w*sx, ph=f.h*sy;
-    oc.clearRect(px, py, pw, ph);
-    oc.fillStyle = 'rgba(255,69,0,0.06)';
-    oc.fillRect(px, py, pw, ph);
-    oc.strokeStyle = 'rgba(255,69,0,1)';
-    oc.lineWidth = 2;
-    oc.strokeRect(px+1, py+1, pw-2, ph-2);
-    const bx=px+9, by=py+9, br=11;
-    oc.beginPath(); oc.arc(bx+br, by+br, br, 0, Math.PI*2); oc.fillStyle='rgba(255,69,0,0.95)'; oc.fill();
-    oc.fillStyle='#fff';
-    oc.font = 'bold 11px Outfit,sans-serif';
-    oc.textAlign='center'; oc.textBaseline='middle';
-    oc.fillText(i+1, bx+br, by+br);
-  });
-}
-
-// ─── GAP / FORMAT CONTROLS ────────────────────────────────────────
-document.getElementById('gap-slider').addEventListener('input', function(){
-  gapPx = parseInt(this.value);
-  document.getElementById('gap-val').textContent = gapPx+'px';
-  renderCollageGrid();
-});
-document.querySelectorAll('.fmt-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    outputFmt = btn.dataset.fmt;
-    updateQualityControls();
-  });
-});
-document.getElementById('quality-slider').addEventListener('input', function(){
-  outputQuality = parseInt(this.value) / 100;
-  document.getElementById('quality-val').textContent = this.value + '%';
-});
-function updateQualityControls() {
-  const isPng = outputFmt === 'png';
-  document.getElementById('quality-row').classList.toggle('disabled', isPng);
-  document.getElementById('quality-hint').classList.toggle('visible', isPng);
-}
-updateQualityControls();
-
-// ─── SLICE ALL ────────────────────────────────────────────────────
-document.getElementById('slice-btn').addEventListener('click', () => { if(collages.length) doSliceAll(); });
-
-function doSliceAll() {
-  const sliceBtn = document.getElementById('slice-btn');
-  sliceBtn.disabled = true;
-  const progWrap  = document.getElementById('prog-wrap');
-  const progFill  = document.getElementById('prog-fill');
-  const progLabel = document.getElementById('prog-label');
-  progWrap.classList.add('visible');
-
-  const mime = {png:'image/png', jpeg:'image/jpeg', webp:'image/webp'}[outputFmt];
-  resultGroups = [];
-  usedNames.clear();
-  let skippedFrames = 0;
-
-  let totalFrames = 0;
-  const plan = collages.map(c => {
-    const frames = selectedLayout.getFrames(c.W, c.H, gapPx);
-    totalFrames += frames.length;
-    return { c, frames };
-  });
-
-  let done = 0;
-  let seq = 0;
-  const pad = String(totalFrames).length;
-  let ci = 0;
-  function nextCollage() {
-    if(ci >= plan.length) { finish(); return; }
-    const { c, frames } = plan[ci];
-    const group = { displayName: c.name, alias: c.alias, tiles: [] };
-    let fi = 0;
-    function nextFrame() {
-      if(fi >= frames.length) {
-        resultGroups.push(group);
-        ci++;
-        requestAnimationFrame(nextCollage);
-        return;
-      }
-      const f = frames[fi];
-      const x = Math.max(0, f.x), y = Math.max(0, f.y);
-      const w = Math.min(f.w, c.W-x), h = Math.min(f.h, c.H-y);
-      if (w <= 0 || h <= 0) {
-        // Degenerate slice (gap too large for this image at this layout) —
-        // skip it instead of producing a broken/empty image.
-        skippedFrames++;
-        fi++;
-        requestAnimationFrame(nextFrame);
-        return;
-      }
-      const tc = document.createElement('canvas');
-      tc.width = w; tc.height = h;
-      tc.getContext('2d').drawImage(c.img, x, y, w, h, 0, 0, w, h);
-      let dataUrl;
-      try {
-        dataUrl = tc.toDataURL(mime, outputQuality);
-      } catch (err) {
-        // Canvas failed to encode (e.g. tainted canvas) — skip rather than
-        // pushing a broken tile that would fail to download correctly.
-        skippedFrames++;
-        fi++;
-        requestAnimationFrame(nextFrame);
-        return;
-      }
-      group.tiles.push({
-        dataUrl,
-        name: `${String(++seq).padStart(pad, '0')}_${randStr(8)}.${outputFmt}`,
-        w, h
-      });
-      done++; fi++;
-      progFill.style.width = Math.round((done/totalFrames)*100)+'%';
-      progLabel.textContent = `${done} / ${totalFrames}`;
-      requestAnimationFrame(nextFrame);
-    }
-    nextFrame();
-  }
-  nextCollage();
-
-  function finish() {
-    sliceBtn.disabled = false;
-    progWrap.classList.remove('visible');
-    progFill.style.width = '0%';
-    renderResults(skippedFrames);
-  }
-}
-
-// ─── RESULTS ──────────────────────────────────────────────────────
-function renderResults(skippedFrames = 0) {
-  const wrap = document.getElementById('groups-wrap');
-  wrap.innerHTML = '';
-  let totalFrames = 0;
-
-  if (skippedFrames > 0) {
-    const warn = document.createElement('div');
-    warn.className = 'skip-warning';
-    warn.textContent = `⚠ ${skippedFrames} frame${skippedFrames>1?'s':''} skipped — the border gap was too large for that image at this layout, so no broken files were included.`;
-    wrap.appendChild(warn);
-  }
-
-  resultGroups.forEach(group => {
-    if (group.tiles.length === 0) return;
-    totalFrames += group.tiles.length;
-    const block = document.createElement('div');
-    block.className = 'group-block';
-    const title = document.createElement('div');
-    title.className = 'group-title';
-    title.textContent = `${group.displayName} — ${group.tiles.length} frames`;
-    block.appendChild(title);
-
-    const tilesGrid = document.createElement('div');
-    tilesGrid.className = 'tiles-grid';
-    group.tiles.forEach((tile, idx) => {
-      const card = document.createElement('div');
-      card.className = 'tile-card';
-      card.style.animationDelay = (idx*0.05)+'s';
-      const iw = document.createElement('div'); iw.className='tile-img-wrap';
-      const im = document.createElement('img'); im.src=tile.dataUrl; im.alt=tile.name;
-      iw.appendChild(im);
-      const ft = document.createElement('div'); ft.className='tile-footer';
-      const approxBytes = Math.round((tile.dataUrl.length - tile.dataUrl.indexOf(',') - 1) * 0.75);
-      const sizeLabel = approxBytes > 1024*1024
-        ? (approxBytes/1024/1024).toFixed(1)+' MB'
-        : Math.round(approxBytes/1024)+' KB';
-      ft.innerHTML = `<div><div class="tile-name">Frame ${idx+1}</div><div class="tile-dims">${tile.w}×${tile.h}px · ${sizeLabel}</div></div><button class="tile-dl-btn">↓ Save</button>`;
-      ft.querySelector('.tile-dl-btn').addEventListener('click', () => {
-        if (!tile.dataUrl || tile.dataUrl === 'data:,') return;
-        const a = document.createElement('a');
-        a.href = tile.dataUrl; a.download = tile.name; a.click();
-      });
-      card.appendChild(iw); card.appendChild(ft);
-      tilesGrid.appendChild(card);
-    });
-    block.appendChild(tilesGrid);
-    wrap.appendChild(block);
-  });
-
-  document.getElementById('frame-count').textContent = totalFrames;
-  document.getElementById('collage-count').textContent = resultGroups.length;
-  document.getElementById('results-section').classList.add('visible');
-  document.getElementById('results-section').scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-// ─── ONE-CLICK ZIP DOWNLOAD ───────────────────────────────────────
-document.getElementById('dl-all-btn').addEventListener('click', async () => {
-  if(resultGroups.length === 0) return;
-  const btn = document.getElementById('dl-all-btn');
-  const originalHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.textContent = 'Zipping…';
-
-  const zip = new JSZip();
-  resultGroups.forEach(group => {
-    group.tiles.forEach(tile => {
-      const base64 = tile.dataUrl.split(',')[1];
-      zip.file(tile.name, base64, { base64: true });
-    });
-  });
-
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${randStr(11)}.zip`;
-  a.click();
-  URL.revokeObjectURL(url);
-
-  btn.disabled = false;
-  btn.innerHTML = originalHTML;
-});
-
-// ─── RESET ────────────────────────────────────────────────────────
-document.getElementById('reset-btn').addEventListener('click', () => {
-  collages = [];
-  resultGroups = [];
-  renderBatchStrip();
-  renderCollageGrid();
-  document.getElementById('preview-section').classList.remove('visible');
-  document.getElementById('results-section').classList.remove('visible');
-  fileInput.value = '';
-});
-
-// ─── INIT ─────────────────────────────────────────────────────────
-buildLayoutCards();
-renderCollageGrid();
-</script>
-</body>
-</html>
+load();buildLayouts();renderGrid();
+</script></body></html>
